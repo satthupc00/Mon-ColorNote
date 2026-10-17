@@ -155,7 +155,7 @@ function header() {
   return `<header class="hdr">
     <div class="brand"><img src="${iconUrl}" alt="">
       <div style="min-width:0"><div class="brand-name"><span><span class="m">Mon</span> <span class="a">TriNote</span></span>${u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}</div>
-      <div class="brand-desc">Đồng bộ PC và điện thoại</div></div></div>
+</div></div>
     ${updBtn}
     ${S.compact ? `<span class="sync ${st}" title="${syncTxt}"><i></i></span>` : `<span class="sync ${st}"><i></i>${syncTxt}</span>`}
     <button class="ibtn" data-act="settings" title="Cài đặt (Ctrl+,)" aria-label="Cài đặt">${I.gear}</button>
