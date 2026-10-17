@@ -8,6 +8,12 @@ export const isDesktop = !!window.desktop;
 export const isAndroid = Capacitor.getPlatform() === 'android';
 export const platformName = isDesktop ? 'PC' : isAndroid ? 'Android' : 'Web';
 const ApkUpdater = isAndroid ? registerPlugin('ApkUpdater') : null;
+const SystemBars = isAndroid ? registerPlugin('SystemBars') : null;
+// Android: tô vùng thanh trạng thái / điều hướng cùng màu nền app
+export function setSystemBars(theme) {
+  if (!SystemBars) return;
+  SystemBars.setColor({ color: theme === 'light' ? '#F3F5F9' : '#1B1D23', light: theme === 'light' }).catch(() => {});
+}
 const SERVER = 'com.mondiro.trinote.vault';
 
 export async function appVersion() {

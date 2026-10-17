@@ -86,28 +86,42 @@ function render(force) {
   const w = window.innerWidth;
   S.compact = w < 600; S.wide = w >= 900;
   app.dataset.at = S.theme;
-  app.className = 'app' + (S.compact ? ' compact' : '') + (matchMedia('(pointer:coarse)').matches ? ' touch' : '');
+  const cls = 'app' + (S.compact ? ' compact' : '') + (matchMedia('(pointer:coarse)').matches ? ' touch' : '') + (P.isDesktop ? ' desktop' : '');
+  if (app.className !== cls) app.className = cls;
   document.body.style.background = S.theme === 'light' ? '#F3F5F9' : '#1B1D23';
   // giữ vị trí cuộn để vẽ lại không bị nhảy
   const scrolls = [...app.querySelectorAll('.scroll,.list,.editor,.chips')].map(el => [el.className.split(' ')[0], el.scrollTop, el.scrollLeft]);
   const main = S.tab === 1 ? tab1() : S.tab === 2 ? tab2() : tab3();
   const fab = fabHtml();
-  if (S.wide) {
-    app.innerHTML = header() + `<div class="body"><nav class="rail" aria-label="Tab">${tabs()}<span class="rail-ind" id="ind"></span></nav>
-      <main class="main tint${S.tab}">${main}${fab}</main></div>
-      <footer class="foot"><span>${footInfo()}</span><span class="credit">Created by Mondiro</span></footer>` + dialog();
-    const ind = document.getElementById('ind'), b = app.querySelector('.rail .tabbtn[aria-selected="true"]');
-    if (ind && b) { ind.style.top = (b.offsetTop + 6) + 'px'; ind.style.background = getComputedStyle(b).backgroundColor; }
-  } else {
-    app.innerHTML = header() + `<main class="main tint${S.tab}">${main}${fab}</main>
-      <nav class="bnav" aria-label="Tab">${tabs()}<span class="credit credit-m">Created by Mondiro</span></nav>` + dialog();
+  // khung cố định; mỗi lần chỉ thay phần nào thật sự đổi (header, tab, nội dung…) để không bị nháy
+  const mode = S.wide ? 'wide' : 'narrow';
+  if (shell !== mode) {
+    shell = mode; parts = {};
+    app.innerHTML = S.wide
+      ? `<div id="p-hdr" class="part"></div><div class="body"><nav class="rail" aria-label="Tab"><div id="p-nav" class="part"></div><span class="rail-ind" id="ind"></span></nav><main id="p-main" class="main"></main></div>
+         <footer class="foot"><span id="p-foot"></span><span class="credit">Created by Mondiro</span></footer><div id="p-dlg" class="part"></div>`
+      : `<div id="p-hdr" class="part"></div><main id="p-main" class="main"></main>
+         <nav class="bnav" aria-label="Tab"><div id="p-nav" class="part"></div><span class="credit credit-m">Created by Mondiro</span></nav><div id="p-dlg" class="part"></div>`;
   }
-  app.classList.toggle('desktop', P.isDesktop);
-  if (P.isDesktop && lastTheme !== S.theme) { lastTheme = S.theme; window.desktop.setTheme?.(S.theme); }
+  setPart('p-hdr', header());
+  setPart('p-nav', tabs());
+  const mainEl = document.getElementById('p-main');
+  if (mainEl.className !== 'main tint' + S.tab) mainEl.className = 'main tint' + S.tab;
+  setPart('p-main', main + fab);
+  if (S.wide) setPart('p-foot', footInfo());
+  setPart('p-dlg', dialog());
+  const ind = document.getElementById('ind'), b = app.querySelector('.rail .tabbtn[aria-selected="true"]');
+  if (ind && b) {
+    const top = (b.offsetTop + 6) + 'px';
+    if (!ind.style.top) { ind.style.transition = 'none'; ind.style.top = top; ind.offsetTop; ind.style.transition = ''; }
+    ind.style.top = top; ind.style.background = getComputedStyle(b).backgroundColor;
+  }
+  if (lastTheme !== S.theme) { lastTheme = S.theme; if (P.isDesktop) window.desktop.setTheme?.(S.theme); P.setSystemBars(S.theme); }
   for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
 }
 // chỉ chạy hiệu ứng xuất hiện cho phần tử mới, không chạy lại mỗi lần vẽ
-let lastTheme = null;
+let lastTheme = null, shell = null, parts = {};
+function setPart(id, html) { if (parts[id] === html) return; parts[id] = html; document.getElementById(id).innerHTML = html; }
 const seen = new Set();
 const enter = id => { if (seen.has(id)) return ''; seen.add(id); return ' enter'; };
 // FLIP: ghi vị trí cũ, thay đổi DOM, rồi trượt mượt từ chỗ cũ sang chỗ mới
@@ -150,7 +164,7 @@ const tabs = () => [1, 2, 3].map(t => `<button class="tabbtn" data-t="${t}" data
 
 function fabHtml() {
   if (S.tab === 1 && !S.wide) return `<button class="fab" data-act="stk-new" aria-label="Sticker mới">${I.plus}</button>`;
-  if (S.tab === 3 && MK && S.t3 === 'open' && groups().length) return `<button class="fab" data-act="acc-new" title="Thêm tài khoản (Ctrl+N)" aria-label="Thêm tài khoản">${I.plus}</button>`;
+  if (S.tab === 3 && MK && S.t3 === 'open' && groups().length && !S.editAcc) return `<button class="fab" data-act="acc-new" title="Thêm tài khoản (Ctrl+N)" aria-label="Thêm tài khoản">${I.plus}</button>`;
   return '';
 }
 
@@ -171,7 +185,7 @@ function gioSticker() {
   if (days > 0) chip = `<span class="gio-chip">Còn ${days} ngày</span>`;
   else if (days === 0) chip = `<span class="gio-chip today">Hôm nay</span>`;
   else { const n = deathAnniversary(GIO_DEATH, y + 1).solar; chip = `<span class="gio-chip past">Đã qua · năm sau ${pad2(n[0])}/${pad2(n[1])}/${n[2]}</span>`; }
-  return `<div class="stk gio" data-fixed="1" aria-label="Đám giỗ má">
+  return `<div class="stk gio" aria-label="Đám giỗ má">
     <div class="gio-h">${I.lotus}<b>Đám giỗ má</b></div>
     <div class="gio-date"><small>${WD[d.getDay()]}</small>${pad2(solar[0])}/${pad2(solar[1])}/${solar[2]}</div>
     ${chip}
@@ -192,7 +206,9 @@ function stickerHtml(s) {
 }
 function tab1() {
   const list = stickers();
-  const body = `<div class="wall">${gioSticker()}${list.map(stickerHtml).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
+  const gioOrder = (DB.get('meta', 'gio') || {}).order ?? Infinity;
+  const all = [{ gio: true, order: gioOrder }, ...list].sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
+  const body = `<div class="wall">${all.map(x => x.gio ? gioSticker() : stickerHtml(x)).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
   return `<div class="bar"><h2>Bảng sticker</h2>${S.wide ? `<button class="btn pri" data-act="stk-new" title="Sticker mới (Ctrl+N)">${I.plus14}Sticker mới</button>` : ''}</div><div class="scroll">${body}</div>`;
 }
 
@@ -205,11 +221,10 @@ function tab2() {
   const lp = `<div class="lpane"><div class="lhead"><b>Phần mềm</b><button class="ibtn sm" data-act="note-new" title="Thêm phần mềm" aria-label="Thêm phần mềm">${I.plus14}</button></div>
     <div class="sortseg"><button data-act="sort" data-v="manual" aria-pressed="${manual}">Tự sắp xếp</button><button data-act="sort" data-v="date" aria-pressed="${!manual}">Mới sửa</button></div>
     ${S.t2new ? `<div class="newname"><input id="newnote" placeholder="Tên phần mềm" enterkeyhint="done"><button class="btn pri" data-act="note-add">Thêm</button></div>` : ''}
-    <div class="list">${list.length ? list.map((a, i) => `<div class="li" draggable="${manual && !S.compact}" data-act="note-pick" data-id="${a.id}" aria-current="${!S.compact && a.id === S.t2sel}">
-      ${manual && !S.compact ? `<span class="grip" title="Kéo để đổi vị trí">${I.grip}</span>` : ''}
+    <div class="list">${list.length ? list.map((a, i) => `<div class="li" data-act="note-pick" data-id="${a.id}" aria-current="${!S.compact && a.id === S.t2sel}">
+      ${manual ? `<span class="grip" title="Giữ rồi kéo để đổi vị trí">${I.grip}</span>` : ''}
       <span class="dot" style="background:${hue(a.name)}33;color:${hue(a.name)}">${esc((a.name || '?')[0].toUpperCase())}</span>
       <span class="nm"><b>${esc(a.name)}</b><small>Sửa ${fmtDate(a.editedAt)}</small></span>
-      ${manual ? `<span class="mv"><button data-act="mv" data-id="${a.id}" data-d="-1" aria-label="Lên" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button data-act="mv" data-id="${a.id}" data-d="1" aria-label="Xuống" ${i === list.length - 1 ? 'disabled' : ''}>${I.dn}</button></span>` : ''}
     </div>`).join('') : `<div class="empty" style="padding:24px 8px">Thêm tên phần mềm đầu tiên, ví dụ "Spine 3.7.94".</div>`}</div></div>`;
   const cur = S.t2sel && DB.get('notes', S.t2sel);
   const dp = cur ? `<div class="dpane"><div class="dhead">${S.compact ? `<button class="back" data-act="back2" aria-label="Quay lại">${I.back}</button>` : ''}
@@ -265,12 +280,12 @@ function tab3() {
     const closed = !!S.closed[a.id];
     return `<div class="acc ${closed ? 'closed' : ''}${enter('a' + a.id)}" style="animation-delay:${Math.min(k, 8) * 50}ms" data-id="${a.id}">
       <div class="acc-h"><button class="acc-tg" data-act="tog" data-id="${a.id}" aria-expanded="${!closed}"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b>${hl(a.title)}</b><span class="chev">${I.chev}</span></button>
-      <button class="more" data-act="acc-edit" data-id="${a.id}" title="Sửa" aria-label="Sửa">${I.pen}</button></div>
+      <button class="more" data-act="acc-menu" data-id="${a.id}" title="Sửa / xóa" aria-label="Tùy chọn tài khoản">${I.dots}</button></div>
       <div class="acc-b">${(a.fields || []).map((f, fi) => { const sk = a.id + ':' + fi; return `<div class="kv"><span title="${esc(f.k)}">${esc(f.k)}</span><code>${f.secret && !S.show[sk] ? '••••••••' : esc(f.v)}</code>
         ${f.secret ? `<button data-act="eye" data-k="${sk}" title="Hiện / ẩn" aria-label="Hiện hoặc ẩn">${S.show[sk] ? I.eyeOff : I.eye}</button>` : ''}<button data-act="copy-f" data-id="${a.id}" data-f="${fi}" title="Copy" aria-label="Copy">${I.copy}</button></div>`; }).join('') || '<div class="kv"><span>Trống</span></div>'}</div></div>`;
   };
   const body = `<div class="dpane">
-    ${S.compact ? `<div class="chips">${gs.map(x => `<button class="chip" data-act="g" data-id="${x.id}" aria-pressed="${x.id === S.t3g}">${esc(x.name)}</button>`).join('')}<button class="chip" data-act="g-new" aria-label="Thêm nhóm">${I.plus14}</button></div>` : ''}
+    ${S.compact ? `<div class="chips">${gs.map(x => `<button class="chip" data-act="g" data-id="${x.id}" aria-pressed="${x.id === S.t3g}">${esc(x.name)}</button>`).join('')}<button class="chip" data-act="g-new" aria-label="Thêm nhóm" title="Thêm nhóm">${I.plus14}</button>${g ? `<button class="chip" data-act="g-menu" data-id="${g.id}" aria-label="Đổi tên hoặc xóa nhóm" title="Đổi tên / xóa nhóm">${I.dots}</button>` : ''}<button class="chip" data-act="lock" aria-label="Khóa lại" title="Khóa lại">${I.lock16}</button></div>` : ''}
     ${g ? `<div class="search">${I.search}<input id="q3" placeholder="Tìm tiêu đề trong ${esc(g.name)}…" value="${esc(S.q)}" autocomplete="off"></div>
     <div class="scroll"><div class="acc-wrap">${list.length ? list.map(card).join('') : `<div class="empty">${q ? `Không có tiêu đề nào khớp "${esc(S.q)}"` : '<b>Nhóm còn trống</b>Bấm + để thêm tài khoản.'}</div>`}</div></div>`
       : `<div class="empty"><b>Tạo nhóm đầu tiên</b>Ví dụ: Mạng xã hội, Công việc, Ngân hàng.<br><br><button class="btn pri" data-act="g-new">${I.plus14}Thêm nhóm</button></div>`}
@@ -352,7 +367,8 @@ const promptDlg = (title, value, ph, fn) => { S.dlg = { type: 'prompt', title, v
 
 // ---------------- Tab 1 actions ----------------
 function stkNew() {
-  const order = Math.max(0, ...stickers().map(s => s.order ?? 0)) + 1;
+  const g = (DB.get('meta', 'gio') || {}).order;
+  const order = Math.max(0, ...stickers().map(s => s.order ?? 0), Number.isFinite(g) ? g : 0) + 1;
   const s = DB.put('stickers', { id: DB.uid(), title: '', color: STK_COLORS[stickers().length % 5], order, items: [] });
   render(true);
   const t = app.querySelector(`.stk-t[data-s="${s.id}"]`); t && t.focus();
@@ -462,14 +478,8 @@ app.addEventListener('click', async e => {
     case 'sort': S.t2sort = d.v; setPref('t2sort', d.v); break;
     case 'note-new': S.t2new = true; S.t2open = false; render(true); document.getElementById('newnote')?.focus(); return;
     case 'note-add': addNote(); return;
-    case 'note-pick': if (e.target.closest('.mv')) return; S.t2sel = d.id; S.t2open = true; break;
+    case 'note-pick': S.t2sel = d.id; S.t2open = true; break;
     case 'back2': S.t2open = false; break;
-    case 'mv': {
-      const list = notes(), i = list.findIndex(x => x.id === d.id), j = i + +d.d; if (j < 0 || j >= list.length) return;
-      list.forEach((n, k) => { if (n.order !== k) DB.put('notes', { ...n, order: k }); });
-      const A = DB.get('notes', list[i].id), B = DB.get('notes', list[j].id);
-      DB.put('notes', { ...A, order: j }); DB.put('notes', { ...B, order: i }); break;
-    }
     case 'note-menu': {
       const n = DB.get('notes', S.t2sel);
       popover(el, `<button class="mi danger" data-del="1">${I.trash}Xóa "${esc(n.name)}"</button>`, () => confirmDlg('Xóa ghi chú?', `Ghi chú "${n.name}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('notes', n.id); S.t2sel = null; S.t2open = false; render(true); }));
@@ -514,6 +524,14 @@ app.addEventListener('click', async e => {
     case 'copy-f': { const ac = vaultCache.find(x => x.id === d.id); copy(ac.fields[+d.f].v); return; }
     case 'acc-new': S.newAcc = { id: DB.uid(), kind: 'acc', groupId: S.t3g, title: '', order: accsOf(S.t3g).length, fields: [{ k: 'Email', v: '', secret: false }, { k: 'Mật khẩu', v: '', secret: true }] };
       vaultCache.push(S.newAcc); S.editAcc = S.newAcc.id; S.t3new = true; S.q = ''; render(true); app.querySelector('[data-ae="title"]')?.focus(); return;
+    case 'acc-menu': {
+      const ac = vaultCache.find(x => x.id === d.id);
+      popover(el, `<button class="mi" data-ed="1">${I.pen}Sửa</button><button class="mi danger" data-del="1">${I.trash}Xóa tài khoản</button>`, o => {
+        if (o.ed) { S.editAcc = d.id; S.t3new = false; S.closed[d.id] = false; render(true); app.querySelector('#accedit')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        if (o.del) confirmDlg('Xóa tài khoản?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); render(true); toast('Đã xóa'); });
+      });
+      return;
+    }
     case 'acc-edit': S.editAcc = d.id; S.t3new = false; S.closed[d.id] = false; break;
     case 'ae-addf': case 'ae-delf': {
       const n = collectAccEditor();
@@ -601,77 +619,90 @@ window.addEventListener('keydown', e => {
   if (e.key.toLowerCase() === 'l' && S.tab === 3 && MK) { e.preventDefault(); lockVault(); render(true); }
 });
 
-// kéo thả đổi thứ tự phần mềm (PC)
-let dragId = null;
-app.addEventListener('dragstart', e => { const li = e.target.closest('.li[data-act="note-pick"]'); if (!li) return; dragId = li.dataset.id; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-app.addEventListener('dragover', e => { const li = e.target.closest('.li[data-act="note-pick"]'); if (!li || !dragId) return; e.preventDefault(); app.querySelectorAll('.li.over').forEach(x => x.classList.remove('over')); li.classList.add('over'); });
-app.addEventListener('drop', e => {
-  const li = e.target.closest('.li[data-act="note-pick"]'); if (!li || !dragId) return; e.preventDefault();
-  const list = notes().map(n => n.id), from = list.indexOf(dragId), to = list.indexOf(li.dataset.id);
-  list.splice(to, 0, list.splice(from, 1)[0]);
-  list.forEach((id, k) => { const n = DB.get('notes', id); if (n.order !== k) DB.put('notes', { ...n, order: k }); });
-  dragId = null; render(true);
-});
-app.addEventListener('dragend', () => { dragId = null; app.querySelectorAll('.li').forEach(x => x.classList.remove('dragging', 'over')); });
-
-// tự khóa khi ẩn app > 1 phút
-// giữ (hold) rồi kéo thả sticker để hoán đổi vị trí (trừ sticker Đám giỗ má)
+// ---------------- giữ (hold) rồi kéo để sắp xếp lại ----------------
+// Dùng cho sticker (Tab Xanh lá, kể cả sticker Đám giỗ má) và danh sách phần mềm (Tab Xanh dương).
+// Khi kéo qua, các mục khác tự trượt nhường chỗ; thả ra là lưu thứ tự mới.
 const HOLD_MS = 320;
 let hold = null, drag = null, eatClick = false;
+const SORTS = [
+  { item: '.stk', box: '.wall', key: el => el.dataset.s || 'gio', ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
+  { item: '.li[data-act="note-pick"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 2 && S.t2sort === 'manual', save: ids => saveNoteOrder(ids) }
+];
 app.addEventListener('pointerdown', e => {
-  if (S.tab !== 1 || e.button > 0) return;
-  const stk = e.target.closest('.stk[data-s]');
-  if (!stk || e.target.closest('input,button,.pop')) return;
-  hold = { stk, id: stk.dataset.s, x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => startDrag(e), HOLD_MS) };
+  if (e.button > 0 || e.target.closest('input,button,.pop,.ov')) return;
+  for (const cfg of SORTS) {
+    const el = e.target.closest(cfg.item);
+    if (el && cfg.ok()) { hold = { cfg, el, x: e.clientX, y: e.clientY, t: setTimeout(startDrag, HOLD_MS) }; return; }
+  }
 });
 function cancelHold() { if (hold) { clearTimeout(hold.t); hold = null; } }
 function startDrag() {
   if (!hold) return;
-  const { stk, id, x, y } = hold; hold = null;
+  const { cfg, el, x, y } = hold; hold = null;
   document.activeElement && document.activeElement.blur();
   getSelection()?.removeAllRanges();
-  drag = { stk, id, x0: x, y0: y, target: null, scroller: stk.closest('.scroll') };
-  stk.classList.add('lift'); app.classList.add('dragging-stk');
+  const r = el.getBoundingClientRect();
+  drag = { cfg, el, box: el.closest(cfg.box), offX: x - r.left, offY: y - r.top, px: x, py: y, last: null, scroller: el.closest('.scroll,.list') };
+  el.classList.add('lift'); app.classList.add('dragging-stk');
   try { navigator.vibrate?.(12); } catch {}
+}
+// đặt mục đang kéo dưới ngón tay/chuột, tính theo vị trí thật của nó trong bố cục
+function follow() {
+  const el = drag.el; el.style.translate = '0 0';
+  const r = el.getBoundingClientRect();
+  el.style.translate = `${drag.px - drag.offX - r.left}px ${drag.py - drag.offY - r.top}px`;
 }
 window.addEventListener('pointermove', e => {
   if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) cancelHold();
   if (!drag) return;
   e.preventDefault();
-  drag.stk.style.translate = `${e.clientX - drag.x0}px ${e.clientY - drag.y0}px`;
-  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('.stk[data-s]');
-  const t = under && under !== drag.stk ? under : null;
-  if (t !== drag.target) { drag.target?.classList.remove('swap-target'); t?.classList.add('swap-target'); drag.target = t; }
-  // tự cuộn khi kéo gần mép
-  const sc = drag.scroller, r = sc && sc.getBoundingClientRect();
-  if (r) { if (e.clientY < r.top + 50) sc.scrollTop -= 12; else if (e.clientY > r.bottom - 50) sc.scrollTop += 12; }
+  drag.px = e.clientX; drag.py = e.clientY;
+  const sc = drag.scroller, sr = sc && sc.getBoundingClientRect();
+  if (sr) { if (e.clientY < sr.top + 50) sc.scrollTop -= 12; else if (e.clientY > sr.bottom - 50) sc.scrollTop += 12; }
+  const over = document.elementFromPoint(e.clientX, e.clientY)?.closest(drag.cfg.item);
+  if (over && over !== drag.el && over !== drag.last && drag.box.contains(over)) {
+    drag.last = over;
+    const sibs = [...drag.box.querySelectorAll(drag.cfg.item)];
+    const before = sibs.indexOf(drag.el) > sibs.indexOf(over);
+    // các mục còn lại trượt nhường chỗ
+    const first = new Map(sibs.filter(x => x !== drag.el).map(x => [x, x.getBoundingClientRect()]));
+    over.parentNode.insertBefore(drag.el, before ? over : over.nextSibling);
+    for (const [x, f] of first) {
+      const l = x.getBoundingClientRect(), dx = f.left - l.left, dy = f.top - l.top;
+      if (Math.abs(dx) > .5 || Math.abs(dy) > .5) x.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 260, easing: EASE });
+    }
+  } else if (!over) drag.last = null;
+  follow();
 }, { passive: false });
-// chặn cuộn trang khi đang kéo trên màn cảm ứng
 window.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
 document.addEventListener('selectstart', e => { if (drag || hold) e.preventDefault(); });
 app.addEventListener('contextmenu', e => { if (drag || hold) e.preventDefault(); });
-function endDrag(cancel) {
+function endDrag() {
   cancelHold();
   if (!drag) return;
-  const { stk, id, target } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 50);
-  target?.classList.remove('swap-target');
+  const { cfg, el, box } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 60);
   app.classList.remove('dragging-stk');
-  const key = x => x.dataset.s || 'gio';
-  flip('.stk', key, () => {
-    if (target && !cancel) {
-      const A = DB.get('stickers', id), B = DB.get('stickers', target.dataset.s);
-      if (A && B) {
-        let oa = A.order ?? 0, ob = B.order ?? 0;
-        if (oa === ob) { stickers().forEach((x, i, arr) => { if (x.order !== arr.length - i) { quiet = true; DB.put('stickers', { ...x, order: arr.length - i }); quiet = false; } }); oa = DB.get('stickers', id).order; ob = DB.get('stickers', target.dataset.s).order; }
-        quiet = true; DB.put('stickers', { ...DB.get('stickers', id), order: ob }); DB.put('stickers', { ...DB.get('stickers', target.dataset.s), order: oa }); quiet = false;
-      }
-    }
-    render(true);
-  }, 420);
+  const ids = [...box.querySelectorAll(cfg.item)].map(cfg.key);
+  // mục đang kéo bay về chỗ mới
+  flip(cfg.item, cfg.key, () => { el.classList.remove('lift'); cfg.save(ids); render(true); }, 300);
 }
-window.addEventListener('pointerup', () => endDrag(false));
-window.addEventListener('pointercancel', () => endDrag(true));
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
 app.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+function saveStickerOrder(ids) {
+  quiet = true;
+  ids.forEach((id, i) => {
+    const order = ids.length - i;
+    if (id === 'gio') { if ((DB.get('meta', 'gio') || {}).order !== order) DB.put('meta', { id: 'gio', order }); return; }
+    const x = DB.get('stickers', id); if (x && x.order !== order) DB.put('stickers', { ...x, order });
+  });
+  quiet = false;
+}
+function saveNoteOrder(ids) {
+  quiet = true;
+  ids.forEach((id, i) => { const n = DB.get('notes', id); if (n && n.order !== i) DB.put('notes', { ...n, order: i }); });
+  quiet = false;
+}
 
 // rời app (chuyển sang app khác) là khóa Tab Đỏ; quay lại Tab Đỏ thì hỏi vân tay lại
 let bioBusy = false, bioEndAt = 0;

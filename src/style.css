@@ -37,6 +37,7 @@ body{background:#1B1D23}
 .app input,.app textarea{font-family:inherit;color:var(--tx)}
 :focus-visible{outline:2px solid var(--red);outline-offset:2px}
 [hidden]{display:none!important}
+.part{display:contents}
 
 /* header */
 .hdr{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);flex:0 0 auto}
@@ -140,7 +141,7 @@ body{background:#1B1D23}
 .dtog[aria-expanded="true"] svg{rotate:180deg}
 /* kéo thả sticker */
 .stk.lift{z-index:50;scale:1.04;rotate:0deg;box-shadow:0 22px 44px rgba(0,0,0,.4);transition:scale var(--t-med) var(--ease-spring),box-shadow var(--t-med);pointer-events:none;position:relative}
-.stk.swap-target{outline:2.5px dashed var(--red);outline-offset:4px;scale:.97}
+.li.lift{scale:1.03;z-index:50;position:relative;pointer-events:none;background:var(--surf);box-shadow:0 14px 30px rgba(0,0,0,.35),inset 3px 0 0 var(--red);transition:scale var(--t-med) var(--ease-spring)}
 .dragging-stk,.dragging-stk *{cursor:grabbing!important;user-select:none!important}
 /* sticker cố định: Đám giỗ má */
 .stk.gio{rotate:0deg!important;background:var(--gio-bg);color:var(--tx);border:1.5px solid var(--gio-line);padding:16px 16px 14px;box-shadow:var(--shadow)}
@@ -249,7 +250,6 @@ body{background:#1B1D23}
 .kv button:hover{color:var(--red);background:var(--surf2)}
 .acc-edit{padding:12px;display:grid;gap:8px}
 .acc-edit .row2{display:flex;gap:6px;align-items:center}
-.acc-edit .row2 .field:first-child{flex:0 0 34%}
 .acc-edit label.sec{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--mu);font-weight:700;white-space:nowrap}
 .acc-edit .acts{display:flex;gap:8px;flex-wrap:wrap}
 .acc-edit .acts .sp{flex:1}
@@ -292,3 +292,22 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(229,56,59,.35)}70%{box-shadow:0 0 0 18px rgba(229,56,59,0)}100%{box-shadow:0 0 0 0 rgba(229,56,59,0)}}
 @keyframes upulse{0%{box-shadow:0 0 0 0 rgba(46,184,114,.5)}70%{box-shadow:0 0 0 10px rgba(46,184,114,0)}100%{box-shadow:0 0 0 0 rgba(46,184,114,0)}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* điện thoại: ẩn thanh cuộn, nội dung canh giữa */
+.touch *{scrollbar-width:none}
+.touch ::-webkit-scrollbar{display:none}
+.wall,.acc-wrap{max-width:1200px;margin-inline:auto}
+.compact .wall{padding-inline:16px}
+.compact .acc-wrap{padding-inline:16px}
+.compact .chips{justify-content:safe center}
+.compact .search{margin-inline:16px}
+.compact .bar{padding-inline:16px}
+.compact .lhead,.compact .sortseg{margin-inline:8px}
+.acc-edit .acts .btn.pri{min-width:90px}
+.acc-edit .row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) auto auto;gap:6px}
+.acc-edit .field{min-width:0;width:100%}
+.acc-edit .acts{justify-content:flex-end}
+.compact .acc-edit .row2{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"k s x" "v v v";row-gap:4px;padding-bottom:6px;border-bottom:1px dashed var(--line)}
+.compact .acc-edit .row2 [data-ae="k"]{grid-area:k} .compact .acc-edit .row2 [data-ae="v"]{grid-area:v}
+.compact .acc-edit .row2 label.sec{grid-area:s} .compact .acc-edit .row2 .more{grid-area:x}
+.compact .acc-edit .acts .sp{flex-basis:100%;height:0}
