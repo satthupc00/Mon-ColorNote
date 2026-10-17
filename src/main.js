@@ -10,6 +10,7 @@ import * as DB from './store.js';
 import * as C from './crypto.js';
 import * as P from './platform.js';
 import { I } from './icons.js';
+import { sampleStickers, sampleNotes, sampleVault } from './sample.js';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -267,6 +268,7 @@ function settings() {
       <div class="row"><div class="t"><b>Mở bằng vân tay</b><small>${S.bio ? (P.isDesktop ? 'Windows Hello' : 'Cảm biến vân tay') : 'Máy này không có cảm biến, sẽ hỏi PIN'}</small></div><button class="sw" role="switch" aria-checked="${S.bio && S.bioOn}" data-act="bio-tog" ${S.bio ? '' : 'disabled'} aria-label="Mở bằng vân tay"></button></div>
       <div class="row"><div class="t"><b>Tự khóa lại</b><small>Sau 1 phút rời Tab Đỏ hoặc ẩn app</small></div></div>
       <div class="row"><div class="t"><b>Đổi mã PIN</b><small>${MK ? 'Cần két đang mở' : 'Mở Tab Đỏ trước rồi đổi'}</small></div><button class="btn ghost" data-act="chpin" ${MK ? '' : 'disabled'}>Đổi</button></div></div>
+    <div class="grp-t">Dữ liệu mẫu</div><div class="grp"><div class="row"><div class="t"><b>Thêm dữ liệu mẫu</b><small>Sticker, ghi chú phần mềm${MK ? ' và tài khoản giả ở Tab Đỏ' : '. Mở Tab Đỏ trước nếu muốn thêm cả tài khoản giả'}</small></div><button class="btn ghost" data-act="sample">Thêm</button></div></div>
     <div class="grp-t">Phiên bản</div><div class="grp"><div class="row"><div class="t"><b>Mon TriNote ${esc(S.version)} · ${P.platformName}</b><small>${esc(updTxt)}</small></div>
       ${u.ev === 'available' ? `<button class="btn pri" data-act="upd-install">Cập nhật</button>` : `<button class="btn pri" data-act="upd-check" ${u.ev === 'checking' || u.ev === 'progress' ? 'disabled' : ''}>${u.ev === 'checking' ? '<span class="spin"></span>' : ''}Kiểm tra bản cập nhật</button>`}</div></div>
     <div class="credit" style="text-align:center;margin-top:6px">Created by Mondiro</div>
@@ -426,6 +428,14 @@ app.addEventListener('click', async e => {
       break;
     }
     case 'lock': lockVault(); toast('Đã khóa Tab Đỏ'); break;
+    case 'sample': {
+      // không thêm trùng nếu đã có mục cùng tên
+      const hasS = new Set(stickers().map(x => x.title)), hasN = new Set(DB.all('notes').map(x => x.name));
+      sampleStickers().filter(x => !hasS.has(x.title)).forEach(x => DB.put('stickers', x));
+      sampleNotes().filter(x => !hasN.has(x.name)).forEach(x => DB.put('notes', x));
+      if (MK && !groups().some(g => g.name.endsWith('(mẫu)'))) for (const v of sampleVault()) await saveVault(v);
+      S.dlg = null; toast(MK ? 'Đã thêm dữ liệu mẫu vào cả 3 tab' : 'Đã thêm mẫu vào Tab Xanh lá và Xanh dương'); break;
+    }
     case 'chpin': S.dlg = null; S.tab = 3; S.t3 = 'newpin'; S.pin = ''; S.pin1 = ''; break;
     case 'bio-tog': S.bioOn = !S.bioOn; setPref('bio', S.bioOn); if (!S.bioOn) { await P.keyClear(); setPref('bioKey', false); } else if (MKB64 && await P.keySave(MKB64)) setPref('bioKey', true); break;
     case 'g': S.t3g = d.id; S.q = ''; S.editAcc = null; break;
