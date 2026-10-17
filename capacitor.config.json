@@ -1,0 +1,6 @@
+{
+  "appId": "com.mondiro.trinote",
+  "appName": "Mon TriNote",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#1B1D23", "adjustMarginsForEdgeToEdge": "force" }
+}
