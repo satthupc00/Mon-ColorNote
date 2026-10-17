@@ -1,8 +1,8 @@
 {
   "name": "mon-trinote",
   "productName": "Mon TriNote",
-  "version": "0.3.0",
-  "description": "Ghi chú 3 màu, đồng bộ PC và điện thoại",
+  "version": "0.3.1",
+  "description": "Đồng bộ PC và điện thoại",
   "author": "Mondiro",
   "private": true,
   "main": "electron/main.cjs",

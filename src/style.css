@@ -311,3 +311,5 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .compact .acc-edit .row2 [data-ae="k"]{grid-area:k} .compact .acc-edit .row2 [data-ae="v"]{grid-area:v}
 .compact .acc-edit .row2 label.sec{grid-area:s} .compact .acc-edit .row2 .more{grid-area:x}
 .compact .acc-edit .acts .sp{flex-basis:100%;height:0}
+.pwform{display:flex;gap:8px;width:min(420px,100%)}
+.pwform .pwin{flex:1;font-size:16px;padding:12px 14px;letter-spacing:.04em}

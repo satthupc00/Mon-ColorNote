@@ -117,6 +117,8 @@ function render(force) {
     ind.style.top = top; ind.style.background = getComputedStyle(b).backgroundColor;
   }
   if (lastTheme !== S.theme) { lastTheme = S.theme; if (P.isDesktop) window.desktop.setTheme?.(S.theme); P.setSystemBars(S.theme); }
+  const pw = document.getElementById('pw');
+  if (pw && !S.dlg && document.activeElement !== pw) pw.focus();
   for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
 }
 // chỉ chạy hiệu ứng xuất hiện cho phần tử mới, không chạy lại mỗi lần vẽ
@@ -153,7 +155,7 @@ function header() {
   return `<header class="hdr">
     <div class="brand"><img src="${iconUrl}" alt="">
       <div style="min-width:0"><div class="brand-name"><span><span class="m">Mon</span> <span class="a">TriNote</span></span>${u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}</div>
-      <div class="brand-desc">Ghi chú 3 màu, đồng bộ PC và điện thoại</div></div></div>
+      <div class="brand-desc">Đồng bộ PC và điện thoại</div></div></div>
     ${updBtn}
     ${S.compact ? `<span class="sync ${st}" title="${syncTxt}"><i></i></span>` : `<span class="sync ${st}"><i></i>${syncTxt}</span>`}
     <button class="ibtn" data-act="settings" title="Cài đặt (Ctrl+,)" aria-label="Cài đặt">${I.gear}</button>
@@ -240,14 +242,22 @@ function hue(s) { const cols = ['#F29A9C', '#86BDF0', '#F2B84B', '#7FD49B', '#B9
 // ---------- Tab 3 ----------
 const dots = n => `<div class="pin-dots ${S.pinErr ? 'shake' : ''}">${[0, 1, 2, 3, 4, 5].map(i => `<i class="${i < n ? 'f' : ''}"></i>`).join('')}</div>`;
 const pad = () => `<div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'x', 0, '⌫'].map(k => k === 'x' ? '<span></span>' : `<button data-act="pin" data-k="${k}" aria-label="${k === '⌫' ? 'Xóa' : k}">${k}</button>`).join('')}</div>`;
+// PC: ô gõ mật khẩu (cho phép cả chữ). Điện thoại: bàn phím số, có nút chuyển sang gõ chữ.
+const textMode = () => P.isDesktop || S.pinText;
+const PW = () => textMode() ? 'mật khẩu' : 'mã PIN';
+function pinUI(btn) {
+  if (textMode()) return `<form class="pwform" data-form="pw" autocomplete="off"><input class="field pwin" id="pw" type="password" placeholder="Gõ ${PW()}…" autocomplete="off" enterkeyhint="done" aria-label="${PW()}"><button class="btn pri" type="submit">${btn}</button></form>
+    <div class="err">${esc(S.pinErr)}</div>${P.isDesktop ? '' : `<button class="linkbtn" data-act="pin-text">Dùng bàn phím số</button>`}`;
+  return `${dots(S.pin.length)}<div class="err">${esc(S.pinErr)}</div>${pad()}<button class="linkbtn" data-act="pin-text">Mật khẩu có chữ? Gõ bằng bàn phím</button>`;
+}
 function tab3() {
   const meta = secMeta();
   if (!meta && S.t3 !== 'recovery') {
     const confirm = !!S.pin1;
-    return `<div class="lock"><h2>${confirm ? 'Nhập lại mã PIN' : 'Tạo mã PIN'}</h2>
-      <p>${confirm ? 'Nhập lại 6 số vừa tạo để chắc chắn.' : 'Đặt 6 số để bảo vệ Tab Đỏ. Từ lần sau chỉ cần vân tay, PIN dùng khi vân tay không được.'}</p>
-      ${!DB.currentUser() && DB.hasFirebase ? `<p style="color:var(--red)">Nên đăng nhập (Cài đặt) trước khi tạo PIN để két dùng chung trên mọi máy.</p>` : ''}
-      ${dots(S.pin.length)}<div class="err">${esc(S.pinErr)}</div>${pad()}</div>`;
+    return `<div class="lock"><h2>${confirm ? 'Nhập lại ' + PW() : 'Tạo ' + PW()}</h2>
+      <p>${confirm ? 'Nhập lại lần nữa để chắc chắn.' : textMode() ? 'Đặt mật khẩu (ít nhất 4 ký tự, được dùng cả chữ và số) để bảo vệ Tab Đỏ.' : 'Đặt 6 số để bảo vệ Tab Đỏ. Từ lần sau chỉ cần vân tay, PIN dùng khi vân tay không được.'}</p>
+      ${!DB.currentUser() && DB.hasFirebase ? `<p style="color:var(--red)">Nên đăng nhập (Cài đặt) trước khi tạo ${PW()} để két dùng chung trên mọi máy.</p>` : ''}
+      ${pinUI(confirm ? 'Xác nhận' : 'Tiếp')}</div>`;
   }
   if (S.t3 === 'recovery') return `<div class="lock"><h2>Mã khôi phục</h2>
     <p>Chép mã này ra giấy hoặc nơi an toàn. Khi quên PIN, đây là cách <b>duy nhất</b> để mở lại Tab Đỏ.</p>
@@ -258,14 +268,14 @@ function tab3() {
     <input class="field" id="reccode" style="max-width:320px;width:100%;text-align:center;font-size:16px;letter-spacing:.06em" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
     <div class="err">${esc(S.pinErr)}</div>
     <div style="display:flex;gap:8px"><button class="btn" data-act="t3-cancel">Quay lại</button><button class="btn pri" data-act="rec-unlock">Mở khóa</button></div></div>`;
-  if (S.t3 === 'newpin') return `<div class="lock"><h2>${S.pin1 ? 'Nhập lại PIN mới' : 'Đặt mã PIN mới'}</h2><p>6 số mới để mở Tab Đỏ.</p>${dots(S.pin.length)}<div class="err">${esc(S.pinErr)}</div>${pad()}</div>`;
+  if (S.t3 === 'newpin') return `<div class="lock"><h2>${S.pin1 ? 'Nhập lại ' + PW() + ' mới' : 'Đặt ' + PW() + ' mới'}</h2><p>${textMode() ? 'Ít nhất 4 ký tự, được dùng cả chữ và số.' : '6 số mới để mở Tab Đỏ.'}</p>${pinUI(S.pin1 ? 'Xác nhận' : 'Tiếp')}</div>`;
   if (!MK) {
     const canBio = S.bio && S.bioOn && pref('bioKey', false);
     if (S.t3 !== 'pin' && canBio) return `<div class="lock"><button class="fp" data-act="fp" aria-label="Mở bằng vân tay">${I.fp}</button>
       <h2>Chạm để mở bằng vân tay</h2><p>${P.isDesktop ? 'Dùng Windows Hello (vân tay hoặc khuôn mặt).' : 'Đặt ngón tay lên cảm biến vân tay.'}</p>
-      <div class="err">${esc(S.pinErr)}</div><button class="linkbtn" data-act="usepin">Dùng mã PIN</button></div>`;
-    return `<div class="lock"><h2>Nhập mã PIN</h2><p>Tab Đỏ đang khóa.</p>${dots(S.pin.length)}<div class="err">${esc(S.pinErr)}</div>${pad()}
-      <div style="display:flex;gap:14px">${canBio ? `<button class="linkbtn" data-act="t3-cancel">Dùng vân tay</button>` : ''}<button class="linkbtn" data-act="forgot">Quên PIN?</button></div></div>`;
+      <div class="err">${esc(S.pinErr)}</div><button class="linkbtn" data-act="usepin">Dùng ${PW()}</button></div>`;
+    return `<div class="lock"><h2>Nhập ${PW()}</h2><p>Tab Đỏ đang khóa.</p>${pinUI('Mở khóa')}
+      <div style="display:flex;gap:14px">${canBio ? `<button class="linkbtn" data-act="t3-cancel">${P.isDesktop ? 'Dùng Windows Hello' : 'Dùng vân tay'}</button>` : ''}<button class="linkbtn" data-act="forgot">Quên ${PW()}?</button></div></div>`;
   }
   // két đang mở
   const gs = groups();
@@ -298,7 +308,7 @@ function accEditor(a) {
   const f = a.fields || [];
   return `<div class="acc" data-id="${a.id}"><div class="acc-edit" id="accedit">
     <input class="field" data-ae="title" value="${esc(a.title)}" placeholder="Tiêu đề, ví dụ: Gmail công việc" style="font-weight:800">
-    ${f.map((x, i) => `<div class="row2" data-fi="${i}"><input class="field" data-ae="k" value="${esc(x.k)}" placeholder="Tên mục"><input class="field" data-ae="v" value="${esc(x.v)}" placeholder="Giá trị" ${x.secret ? 'type="password"' : ''}>
+    ${f.map((x, i) => `<div class="row2" data-fi="${i}"><input class="field" data-ae="k" value="${esc(x.k)}" placeholder="Tên mục"><input class="field" data-ae="v" value="${esc(x.v)}" placeholder="Giá trị">
       <label class="sec" title="Che giá trị"><input type="checkbox" data-ae="s" ${x.secret ? 'checked' : ''}>Ẩn</label><button class="more" data-act="ae-delf" data-fi="${i}" aria-label="Xóa dòng">${I.x14}</button></div>`).join('')}
     <div class="acts"><button class="btn ghost" data-act="ae-addf">${I.plus14}Thêm dòng</button><span class="sp"></span>
       ${S.t3new ? '' : `<button class="btn ghost danger" data-act="acc-del" data-id="${a.id}">Xóa</button>`}<button class="btn" data-act="ae-cancel">Hủy</button><button class="btn pri" data-act="ae-save">Lưu</button></div>
@@ -331,8 +341,9 @@ function settings() {
     <div class="grp-t">Tài khoản đồng bộ</div><div class="grp">${acct}</div>
     <div class="grp-t">Bảo mật Tab Đỏ</div><div class="grp">
       <div class="row"><div class="t"><b>Mở bằng vân tay</b><small>${S.bio ? (P.isDesktop ? 'Windows Hello' : 'Cảm biến vân tay') : 'Máy này không có cảm biến, sẽ hỏi PIN'}</small></div><button class="sw" role="switch" aria-checked="${S.bio && S.bioOn}" data-act="bio-tog" ${S.bio ? '' : 'disabled'} aria-label="Mở bằng vân tay"></button></div>
-      <div class="row"><div class="t"><b>Tự khóa lại</b><small>Sau 1 phút rời Tab Đỏ hoặc ẩn app</small></div></div>
-      <div class="row"><div class="t"><b>Đổi mã PIN</b><small>${MK ? 'Cần két đang mở' : 'Mở Tab Đỏ trước rồi đổi'}</small></div><button class="btn ghost" data-act="chpin" ${MK ? '' : 'disabled'}>Đổi</button></div></div>
+      ${P.isDesktop ? `<div class="row"><div class="t"><b>Tự khóa khi chuyển sang app khác</b><small>Tắt: chỉ khóa khi đóng hẳn app hoặc bấm nút khóa</small></div><button class="sw" role="switch" aria-checked="${pref('pcAutoLock', false)}" data-act="autolock-tog" aria-label="Tự khóa"></button></div>`
+        : `<div class="row"><div class="t"><b>Tự khóa lại</b><small>Khi chuyển sang app khác, hoặc sau 1 phút rời Tab Đỏ</small></div></div>`}
+      <div class="row"><div class="t"><b>Đổi ${PW()}</b><small>${MK ? 'Cần két đang mở' : 'Mở Tab Đỏ trước rồi đổi'}</small></div><button class="btn ghost" data-act="chpin" ${MK ? '' : 'disabled'}>Đổi</button></div></div>
     <div class="grp-t">Dữ liệu mẫu</div><div class="grp"><div class="row"><div class="t"><b>Thêm dữ liệu mẫu</b><small>Sticker, ghi chú phần mềm${MK ? ' và tài khoản giả ở Tab Đỏ' : '. Mở Tab Đỏ trước nếu muốn thêm cả tài khoản giả'}</small></div><button class="btn ghost" data-act="sample">Thêm</button></div></div>
     <div class="grp-t">Phiên bản</div><div class="grp"><div class="row"><div class="t"><b>Mon TriNote ${esc(S.version)} · ${P.platformName}</b><small>${esc(updTxt)}</small></div>
       ${u.ev === 'available' ? `<button class="btn pri" data-act="upd-install">Cập nhật</button>` : `<button class="btn pri" data-act="upd-check" ${u.ev === 'checking' || u.ev === 'progress' ? 'disabled' : ''}>${u.ev === 'checking' ? '<span class="spin"></span>' : ''}Kiểm tra bản cập nhật</button>`}</div></div>
@@ -382,10 +393,15 @@ async function pinKey(k) {
   if (S.pin.length >= 6) return;
   S.pin += k; S.pinErr = ''; render(true);
   if (S.pin.length < 6) return;
-  const pin = S.pin;
+  return usePin(S.pin);
+}
+async function usePin(pin) {
   const meta = secMeta();
   if (!meta || S.t3 === 'newpin') {
-    if (!S.pin1) { S.pin1 = pin; S.pin = ''; return render(true); }
+    if (!S.pin1) {
+      if (textMode() && pin.length < 4) { S.pinErr = 'Mật khẩu cần ít nhất 4 ký tự'; return render(true); }
+      S.pin1 = pin; S.pin = ''; S.pinErr = ''; return render(true);
+    }
     if (S.pin1 !== pin) { S.pin1 = ''; S.pin = ''; S.pinErr = 'Hai lần nhập không khớp, tạo lại nhé'; return render(true); }
     S.pin1 = ''; S.pin = '';
     if (!meta) {
@@ -395,7 +411,7 @@ async function pinKey(k) {
       S.recovery = v.recovery; S.t3 = 'recovery';
     } else {
       DB.put('meta', { id: 'sec', ...(await C.rewrapPin(meta, MKB64, pin)) });
-      S.t3 = 'open'; toast('Đã đổi mã PIN');
+      S.t3 = 'open'; toast('Đã đổi ' + PW());
     }
     return render(true);
   }
@@ -403,7 +419,7 @@ async function pinKey(k) {
     const r = await C.unlockWithPin(meta, pin);
     await setUnlocked(r.mk, r.mkB64, meta.keyId, true);
     S.pin = ''; S.t3 = 'open';
-  } catch { S.pin = ''; S.pinErr = 'Sai mã PIN'; }
+  } catch { S.pin = ''; S.pinErr = 'Sai ' + PW(); }
   render(true);
 }
 async function setUnlocked(mk, b64, keyId, saveForBio) {
@@ -443,7 +459,7 @@ app.addEventListener('click', async e => {
   switch (a) {
     case 'tab': {
       const t = +d.t; if (S.tab === 3 && t !== 3) leftTab3At = Date.now();
-      if (t === 3 && S.tab !== 3 && MK && leftTab3At && Date.now() - leftTab3At > 60000) lockVault();
+      if (t === 3 && S.tab !== 3 && MK && autoLock() && leftTab3At && Date.now() - leftTab3At > 60000) lockVault();
       S.tab = t; setPref('tab', t);
       if (t === 3 && !MK && secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false)) { render(true); return bioUnlock(); }
       break;
@@ -487,6 +503,7 @@ app.addEventListener('click', async e => {
     }
     // tab 3
     case 'pin': pinKey(d.k); return;
+    case 'pin-text': S.pinText = !S.pinText; S.pin = ''; S.pinErr = ''; break;
     case 'fp': bioUnlock(); return;
     case 'usepin': S.t3 = 'pin'; S.pinErr = ''; break;
     case 'forgot': S.t3 = 'forgot'; S.pinErr = ''; break;
@@ -508,6 +525,7 @@ app.addEventListener('click', async e => {
       S.dlg = null; toast(MK ? 'Đã thêm dữ liệu mẫu vào cả 3 tab' : 'Đã thêm mẫu vào Tab Xanh lá và Xanh dương'); break;
     }
     case 'chpin': S.dlg = null; S.tab = 3; S.t3 = 'newpin'; S.pin = ''; S.pin1 = ''; break;
+    case 'autolock-tog': setPref('pcAutoLock', !pref('pcAutoLock', false)); break;
     case 'bio-tog': S.bioOn = !S.bioOn; setPref('bio', S.bioOn); if (!S.bioOn) { await P.keyClear(); setPref('bioKey', false); } else if (MKB64 && await P.keySave(MKB64)) setPref('bioKey', true); break;
     case 'g': S.t3g = d.id; S.q = ''; S.editAcc = null; break;
     case 'g-new': promptDlg('Nhóm mới', '', 'Ví dụ: Mạng xã hội', async v => { if (!v) return; const id = DB.uid(); await saveVault({ id, kind: 'group', name: v, order: groups().length }); S.t3g = id; render(true); }); return;
@@ -570,6 +588,10 @@ function addNote() {
   render(true);
 }
 
+app.addEventListener('submit', e => {
+  e.preventDefault();
+  if (e.target.dataset.form === 'pw') { const v = document.getElementById('pw').value; if (v) usePin(v); }
+});
 // gõ chữ: lưu ngay, không vẽ lại để không mất con trỏ
 const saveTimers = {};
 const debounce = (k, fn, ms = 500) => { clearTimeout(saveTimers[k]); saveTimers[k] = setTimeout(fn, ms); };
@@ -610,8 +632,8 @@ app.addEventListener('paste', e => {
 // phím tắt
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (S.dlg) { S.dlg = null; render(true); } closePop(); return; }
-  if (S.tab === 3 && !MK && /^[0-9]$/.test(e.key) && !editing() && !S.dlg && S.t3 !== 'forgot') { pinKey(e.key); return; }
-  if (S.tab === 3 && !MK && e.key === 'Backspace' && !editing() && !S.dlg) { pinKey('⌫'); return; }
+  if (S.tab === 3 && !MK && !textMode() && /^[0-9]$/.test(e.key) && !editing() && !S.dlg && S.t3 !== 'forgot') { pinKey(e.key); return; }
+  if (S.tab === 3 && !MK && !textMode() && e.key === 'Backspace' && !editing() && !S.dlg) { pinKey('⌫'); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
   if (['1', '2', '3'].includes(e.key)) { e.preventDefault(); app.querySelector(`.tabbtn[data-t="${e.key}"]`)?.click(); }
   if (e.key === ',') { e.preventDefault(); S.dlg = { type: 'settings' }; render(true); }
@@ -706,8 +728,9 @@ function saveNoteOrder(ids) {
 
 // rời app (chuyển sang app khác) là khóa Tab Đỏ; quay lại Tab Đỏ thì hỏi vân tay lại
 let bioBusy = false, bioEndAt = 0;
+const autoLock = () => !P.isDesktop || pref('pcAutoLock', false);
 function onLeaveApp() {
-  if (bioBusy || !MK) return;
+  if (bioBusy || !MK || !autoLock()) return;
   lockVault(); render(true);
 }
 function onBackToApp() {
