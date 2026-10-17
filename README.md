@@ -43,6 +43,6 @@ npm run dist:win     # đóng gói .exe
 npm run android:sync # đồng bộ code web sang android/
 ```
 
-Phát hành: tăng `version` trong `package.json`, thêm `release-notes/vX.Y.Z.md`, tạo tag `vX.Y.Z` và push. GitHub Actions tự build `.exe` + `.apk` và tạo Release.
+Phát hành: tăng `version` trong `package.json`, thêm `release-notes/vX.Y.Z.md` rồi push. GitHub Actions thấy version mới sẽ tự build `.exe` + `.apk` và tạo Release `vX.Y.Z`.
 
 APK đang ký bằng `android/app/trinote-release.jks` đi kèm repo. Muốn an toàn hơn thì thêm GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (dùng đúng keystore cũ, nếu đổi keystore thì phải gỡ app cũ rồi cài lại).

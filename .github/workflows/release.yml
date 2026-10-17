@@ -1,24 +1,36 @@
-# Đẩy tag dạng v0.1.0 lên là tự build bản PC (Windows) + Android rồi phát hành lên GitHub Releases.
+# Mỗi lần push mà "version" trong package.json là bản chưa phát hành:
+# tự build bản PC (Windows) + Android rồi tạo GitHub Release vX.Y.Z.
 name: Release
 on:
   push:
-    tags: ['v*']
+    branches: ['**']
+    paths: ['package.json', '.github/workflows/release.yml']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag để build lại (vd v0.1.0)'
-        required: true
 permissions:
   contents: write
-env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+concurrency: release
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      go: ${{ steps.v.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          TAG="v$(node -p "require('./package.json').version")"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "go=false" >> "$GITHUB_OUTPUT"; else echo "go=true" >> "$GITHUB_OUTPUT"; fi
+
   windows:
+    needs: check
+    if: needs.check.outputs.go == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with: { ref: '${{ env.TAG }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
@@ -33,10 +45,12 @@ jobs:
             release/latest.yml
 
   android:
+    needs: check
+    if: needs.check.outputs.go == 'true'
     runs-on: ubuntu-latest
+    env: { TAG: '${{ needs.check.outputs.tag }}' }
     steps:
       - uses: actions/checkout@v4
-        with: { ref: '${{ env.TAG }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: actions/setup-java@v4
@@ -61,16 +75,17 @@ jobs:
         with: { name: android, path: out/*.apk }
 
   publish:
-    needs: [windows, android]
+    needs: [check, windows, android]
     runs-on: ubuntu-latest
+    env: { TAG: '${{ needs.check.outputs.tag }}' }
     steps:
       - uses: actions/checkout@v4
-        with: { ref: '${{ env.TAG }}' }
       - uses: actions/download-artifact@v4
         with: { path: dist-all, merge-multiple: true }
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           name: Mon TriNote ${{ env.TAG }}
           body_path: release-notes/${{ env.TAG }}.md
           make_latest: true
