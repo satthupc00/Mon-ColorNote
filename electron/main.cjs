@@ -9,6 +9,10 @@ const userDir = app.getPath('userData');
 const winStateFile = path.join(userDir, 'window.json');
 const keyFile = path.join(userDir, 'vault.key');
 let win;
+// màu thanh điều khiển cửa sổ (thu nhỏ / phóng to / đóng) theo theme của app
+const BAR = { dark: { color: '#1B1D23', symbolColor: '#ECEDF1' }, light: { color: '#F3F5F9', symbolColor: '#2A2D35' } };
+const themeFile = path.join(userDir, 'theme.txt');
+const savedTheme = () => { try { return fs.readFileSync(themeFile, 'utf8') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } };
 
 function loadWinState() {
   try {
@@ -23,7 +27,8 @@ function createWindow() {
   const st = loadWinState();
   win = new BrowserWindow({
     ...st, minWidth: 420, minHeight: 560,
-    title: 'Mon TriNote', backgroundColor: '#1B1D23', autoHideMenuBar: true,
+    title: 'Mon TriNote', backgroundColor: BAR[savedTheme()].color, autoHideMenuBar: true,
+    titleBarStyle: 'hidden', titleBarOverlay: { ...BAR[savedTheme()], height: 58 },
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false }
   });
@@ -80,6 +85,11 @@ ipcMain.handle('upd:check', async () => {
 ipcMain.handle('upd:download', () => autoUpdater.downloadUpdate());
 ipcMain.handle('upd:install', () => autoUpdater.quitAndInstall(true, true));
 ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('app:theme', (_e, t) => {
+  const b = BAR[t] || BAR.dark;
+  try { fs.writeFileSync(themeFile, t); } catch {}
+  if (win && !win.isDestroyed()) { win.setBackgroundColor(b.color); try { win.setTitleBarOverlay({ ...b, height: 58 }); } catch {} }
+});
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());

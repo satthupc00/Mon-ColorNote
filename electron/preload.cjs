@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktop', {
   keyLoad: () => ipcRenderer.invoke('key:load'),
   keyClear: () => ipcRenderer.invoke('key:clear'),
   version: () => ipcRenderer.invoke('app:version'),
+  setTheme: t => ipcRenderer.invoke('app:theme', t),
   checkUpdate: () => ipcRenderer.invoke('upd:check'),
   downloadUpdate: () => ipcRenderer.invoke('upd:download'),
   installUpdate: () => ipcRenderer.invoke('upd:install'),

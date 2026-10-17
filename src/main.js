@@ -11,6 +11,7 @@ import * as C from './crypto.js';
 import * as P from './platform.js';
 import { I } from './icons.js';
 import { sampleStickers, sampleNotes, sampleVault } from './sample.js';
+import { deathAnniversary, canChi } from './lunar.js';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -29,6 +30,7 @@ const fmtDate = t => {
 const S = {
   tab: pref('tab', 1), theme: pref('theme', 'dark'),
   t2sel: null, t2sort: pref('t2sort', 'manual'), t2open: false, t2new: false,
+  doneOpen: pref('doneOpen', {}),
   t3: 'lock', pin: '', pin1: '', pinErr: '', recovery: '', t3g: null, q: '', closed: pref('closed', {}), show: {}, editAcc: null, t3new: false,
   dlg: null, upd: { ev: 'idle' }, version: '', compact: false, wide: false, bio: false, bioOn: pref('bio', true),
   login: { email: '', msg: '', err: false, busy: false }
@@ -86,6 +88,8 @@ function render(force) {
   app.dataset.at = S.theme;
   app.className = 'app' + (S.compact ? ' compact' : '') + (matchMedia('(pointer:coarse)').matches ? ' touch' : '');
   document.body.style.background = S.theme === 'light' ? '#F3F5F9' : '#1B1D23';
+  // giữ vị trí cuộn để vẽ lại không bị nhảy
+  const scrolls = [...app.querySelectorAll('.scroll,.list,.editor,.chips')].map(el => [el.className.split(' ')[0], el.scrollTop, el.scrollLeft]);
   const main = S.tab === 1 ? tab1() : S.tab === 2 ? tab2() : tab3();
   const fab = fabHtml();
   if (S.wide) {
@@ -95,9 +99,30 @@ function render(force) {
     const ind = document.getElementById('ind'), b = app.querySelector('.rail .tabbtn[aria-selected="true"]');
     if (ind && b) { ind.style.top = (b.offsetTop + 6) + 'px'; ind.style.background = getComputedStyle(b).backgroundColor; }
   } else {
-    app.innerHTML = header() + `<main class="main tint${S.tab}">${main}${fab}<span class="credit credit-m">Created by Mondiro</span></main>
-      <nav class="bnav" aria-label="Tab">${tabs()}</nav>` + dialog();
+    app.innerHTML = header() + `<main class="main tint${S.tab}">${main}${fab}</main>
+      <nav class="bnav" aria-label="Tab">${tabs()}<span class="credit credit-m">Created by Mondiro</span></nav>` + dialog();
   }
+  app.classList.toggle('desktop', P.isDesktop);
+  if (P.isDesktop && lastTheme !== S.theme) { lastTheme = S.theme; window.desktop.setTheme?.(S.theme); }
+  for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
+}
+// chỉ chạy hiệu ứng xuất hiện cho phần tử mới, không chạy lại mỗi lần vẽ
+let lastTheme = null;
+const seen = new Set();
+const enter = id => { if (seen.has(id)) return ''; seen.add(id); return ' enter'; };
+// FLIP: ghi vị trí cũ, thay đổi DOM, rồi trượt mượt từ chỗ cũ sang chỗ mới
+const EASE = 'cubic-bezier(.22,1,.36,1)';
+function flip(sel, keyOf, mutate, dur = 340) {
+  const first = new Map();
+  app.querySelectorAll(sel).forEach(el => first.set(keyOf(el), el.getBoundingClientRect()));
+  mutate();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  app.querySelectorAll(sel).forEach(el => {
+    const f = first.get(keyOf(el)), l = el.getBoundingClientRect();
+    if (!f) { el.animate([{ opacity: 0, scale: .92 }, { opacity: 1, scale: 1 }], { duration: 260, easing: EASE }); return; }
+    const dx = f.left - l.left, dy = f.top - l.top;
+    if (Math.abs(dx) > .5 || Math.abs(dy) > .5) el.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: dur, easing: EASE });
+  });
 }
 const footInfo = () => {
   if (S.tab === 1) { const s = stickers(); return `${s.length} sticker · ${s.reduce((n, x) => n + (x.items || []).filter(i => !i.done).length, 0)} mục chưa xong`; }
@@ -130,19 +155,44 @@ function fabHtml() {
 }
 
 // ---------- Tab 1 ----------
+const rotOf = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 7) - 3) * .5; };
+const DONE_MAX = 3;
+// Sticker cố định: Đám giỗ má (ngày mất 31/10/2021 dương lịch), tự tính ngày dương lịch theo từng năm
+const GIO_DEATH = [31, 10, 2021];
+const WD = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+const pad2 = n => String(n).padStart(2, '0');
+function gioSticker() {
+  const now = new Date(), y = now.getFullYear();
+  const today = new Date(y, now.getMonth(), now.getDate());
+  const { lunar, solar } = deathAnniversary(GIO_DEATH, y);
+  const d = new Date(solar[2], solar[1] - 1, solar[0]);
+  const days = Math.round((d - today) / 86400000);
+  let chip;
+  if (days > 0) chip = `<span class="gio-chip">Còn ${days} ngày</span>`;
+  else if (days === 0) chip = `<span class="gio-chip today">Hôm nay</span>`;
+  else { const n = deathAnniversary(GIO_DEATH, y + 1).solar; chip = `<span class="gio-chip past">Đã qua · năm sau ${pad2(n[0])}/${pad2(n[1])}/${n[2]}</span>`; }
+  return `<div class="stk gio" data-fixed="1" aria-label="Đám giỗ má">
+    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b></div>
+    <div class="gio-date"><small>${WD[d.getDay()]}</small>${pad2(solar[0])}/${pad2(solar[1])}/${solar[2]}</div>
+    ${chip}
+    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất ${pad2(GIO_DEATH[0])}/${pad2(GIO_DEATH[1])}/${GIO_DEATH[2]}</div>
+  </div>`;
+}
+function stickerHtml(s) {
+  const items = s.items || [];
+  const todo = items.filter(x => !x.done), done = items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const open = !!S.doneOpen[s.id], shown = open ? done : done.slice(0, DONE_MAX);
+  const row = x => `<div class="it" data-s="${s.id}" data-i="${x.id}"><input type="checkbox" ${x.done ? 'checked' : ''} data-act="it-chk" aria-label="Đánh dấu xong"><span class="it-t" contenteditable="plaintext-only" data-edit="it">${esc(x.text)}</span><button class="x" data-act="it-del" aria-label="Xóa mục" title="Xóa mục">${I.x14}</button></div>`;
+  return `<div class="stk ${s.color || 'y'}${enter('s' + s.id)}" style="--rot:${rotOf(s.id)}deg" data-s="${s.id}">
+    <div class="stk-h"><span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span><button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn sticker" title="Đổi màu / xóa">${I.dots}</button></div>
+    ${todo.map(row).join('')}
+    <div class="addit">${I.plus14}<input data-add="${s.id}" placeholder="Thêm mục" enterkeyhint="done" aria-label="Thêm mục"></div>
+    ${done.length ? `<div class="done"><div class="done-h">Đã xong (${done.length})${done.length > DONE_MAX ? `<button class="dtog" data-act="done-tog" data-s="${s.id}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem hết'}">${open ? 'Thu gọn' : `+${done.length - DONE_MAX}`}${I.chev}</button>` : ''}<button class="clr" data-act="clr" data-s="${s.id}">Xóa hết</button></div>${shown.map(row).join('')}</div>` : ''}
+  </div>`;
+}
 function tab1() {
   const list = stickers();
-  const body = list.length ? `<div class="wall">${list.map((s, si) => {
-    const items = s.items || [];
-    const todo = items.filter(x => !x.done), done = items.filter(x => x.done);
-    const row = x => `<div class="it" data-s="${s.id}" data-i="${x.id}"><input type="checkbox" ${x.done ? 'checked' : ''} data-act="it-chk" aria-label="Đánh dấu xong"><span class="it-t" contenteditable="plaintext-only" data-edit="it">${esc(x.text)}</span><button class="x" data-act="it-del" aria-label="Xóa mục" title="Xóa mục">${I.x14}</button></div>`;
-    return `<div class="stk ${s.color || 'y'}" style="--rot:${((si * 37) % 7 - 3) * .5}deg;animation-delay:${Math.min(si, 8) * 50}ms" data-s="${s.id}">
-      <div class="stk-h"><span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span><button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn sticker" title="Đổi màu / xóa">${I.dots}</button></div>
-      ${todo.map(row).join('')}
-      <div class="addit">${I.plus14}<input data-add="${s.id}" placeholder="Thêm mục" enterkeyhint="done" aria-label="Thêm mục"></div>
-      ${done.length ? `<div class="done"><div class="done-h">Đã xong (${done.length})<button data-act="clr" data-s="${s.id}">Xóa hết</button></div>${done.map(row).join('')}</div>` : ''}
-    </div>`;
-  }).join('')}</div>` : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`;
+  const body = `<div class="wall">${gioSticker()}${list.map(stickerHtml).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
   return `<div class="bar"><h2>Bảng sticker</h2>${S.wide ? `<button class="btn pri" data-act="stk-new" title="Sticker mới (Ctrl+N)">${I.plus14}Sticker mới</button>` : ''}</div><div class="scroll">${body}</div>`;
 }
 
@@ -213,7 +263,7 @@ function tab3() {
   const card = (a, k) => {
     if (S.editAcc === a.id) return accEditor(a);
     const closed = !!S.closed[a.id];
-    return `<div class="acc ${closed ? 'closed' : ''}" style="animation-delay:${Math.min(k, 8) * 50}ms" data-id="${a.id}">
+    return `<div class="acc ${closed ? 'closed' : ''}${enter('a' + a.id)}" style="animation-delay:${Math.min(k, 8) * 50}ms" data-id="${a.id}">
       <div class="acc-h"><button class="acc-tg" data-act="tog" data-id="${a.id}" aria-expanded="${!closed}"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b>${hl(a.title)}</b><span class="chev">${I.chev}</span></button>
       <button class="more" data-act="acc-edit" data-id="${a.id}" title="Sửa" aria-label="Sửa">${I.pen}</button></div>
       <div class="acc-b">${(a.fields || []).map((f, fi) => { const sk = a.id + ':' + fi; return `<div class="kv"><span title="${esc(f.k)}">${esc(f.k)}</span><code>${f.secret && !S.show[sk] ? '••••••••' : esc(f.v)}</code>
@@ -307,7 +357,8 @@ function stkNew() {
   render(true);
   const t = app.querySelector(`.stk-t[data-s="${s.id}"]`); t && t.focus();
 }
-function stkUpdate(id, fn) { const s = DB.get('stickers', id); if (!s) return; const n = structuredClone(s); fn(n); DB.put('stickers', n); }
+let quiet = false;
+function stkUpdate(id, fn, silent) { const s = DB.get('stickers', id); if (!s) return; const n = structuredClone(s); fn(n); quiet = !!silent; DB.put('stickers', n); quiet = false; }
 
 // ---------------- Tab 3 actions ----------------
 async function pinKey(k) {
@@ -346,8 +397,11 @@ async function setUnlocked(mk, b64, keyId, saveForBio) {
 }
 function lockVault() { MK = null; MKB64 = null; MKID = null; vaultCache = []; S.t3 = 'lock'; S.pin = ''; S.pinErr = ''; S.editAcc = null; S.show = {}; S.q = ''; }
 async function bioUnlock() {
-  const meta = secMeta(); if (!meta) return;
-  if (!await P.bioVerify('Mở khóa Tab Đỏ')) { S.pinErr = 'Chưa xác thực được, thử lại hoặc dùng PIN'; return render(true); }
+  const meta = secMeta(); if (!meta || bioBusy) return;
+  bioBusy = true;
+  const ok = await P.bioVerify('Mở khóa Tab Đỏ');
+  bioBusy = false; bioEndAt = Date.now();
+  if (!ok) { S.pinErr = 'Chưa xác thực được, thử lại hoặc dùng PIN'; return render(true); }
   const b64 = await P.keyLoad();
   if (!b64) { setPref('bioKey', false); S.t3 = 'pin'; S.pinErr = 'Cần nhập PIN một lần trên máy này'; return render(true); }
   try {
@@ -388,9 +442,16 @@ app.addEventListener('click', async e => {
     case 'copy': copy(d.v); return;
     // tab 1
     case 'stk-new': stkNew(); return;
-    case 'it-chk': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { const it = s.items.find(x => x.id === r.dataset.i); it.done = !it.done; it.doneAt = it.done ? Date.now() : 0; }); setTimeout(() => render(true), 240); return; }
+    case 'it-chk': {
+      const r = el.closest('.it'), sid = r.dataset.s, iid = r.dataset.i;
+      stkUpdate(sid, s => { const it = s.items.find(x => x.id === iid); it.done = !it.done; it.doneAt = it.done ? Date.now() : 0; }, true);
+      // đợi dấu tick hiện xong rồi trượt mục xuống "Đã xong"
+      setTimeout(() => flip('.stk', x => x.dataset.s || 'gio', () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
+      return;
+    }
+    case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); return; }
     case 'it-del': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); break; }
-    case 'clr': stkUpdate(d.s, s => { s.items = s.items.filter(x => !x.done); }); toast('Đã xóa các mục đã xong'); break;
+    case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
       popover(el, `<div class="sw">${STK_COLORS.map(c => `<button data-c="${c}" aria-pressed="${s.color === c}" style="background:var(--st-${c})" aria-label="Màu"></button>`).join('')}</div><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
@@ -554,15 +615,81 @@ app.addEventListener('drop', e => {
 app.addEventListener('dragend', () => { dragId = null; app.querySelectorAll('.li').forEach(x => x.classList.remove('dragging', 'over')); });
 
 // tự khóa khi ẩn app > 1 phút
-let hiddenAt = 0;
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) hiddenAt = Date.now();
-  else if (MK && hiddenAt && Date.now() - hiddenAt > 60000) { lockVault(); render(true); }
+// giữ (hold) rồi kéo thả sticker để hoán đổi vị trí (trừ sticker Đám giỗ má)
+const HOLD_MS = 320;
+let hold = null, drag = null, eatClick = false;
+app.addEventListener('pointerdown', e => {
+  if (S.tab !== 1 || e.button > 0) return;
+  const stk = e.target.closest('.stk[data-s]');
+  if (!stk || e.target.closest('input,button,.pop')) return;
+  hold = { stk, id: stk.dataset.s, x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => startDrag(e), HOLD_MS) };
 });
+function cancelHold() { if (hold) { clearTimeout(hold.t); hold = null; } }
+function startDrag() {
+  if (!hold) return;
+  const { stk, id, x, y } = hold; hold = null;
+  document.activeElement && document.activeElement.blur();
+  getSelection()?.removeAllRanges();
+  drag = { stk, id, x0: x, y0: y, target: null, scroller: stk.closest('.scroll') };
+  stk.classList.add('lift'); app.classList.add('dragging-stk');
+  try { navigator.vibrate?.(12); } catch {}
+}
+window.addEventListener('pointermove', e => {
+  if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) cancelHold();
+  if (!drag) return;
+  e.preventDefault();
+  drag.stk.style.translate = `${e.clientX - drag.x0}px ${e.clientY - drag.y0}px`;
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('.stk[data-s]');
+  const t = under && under !== drag.stk ? under : null;
+  if (t !== drag.target) { drag.target?.classList.remove('swap-target'); t?.classList.add('swap-target'); drag.target = t; }
+  // tự cuộn khi kéo gần mép
+  const sc = drag.scroller, r = sc && sc.getBoundingClientRect();
+  if (r) { if (e.clientY < r.top + 50) sc.scrollTop -= 12; else if (e.clientY > r.bottom - 50) sc.scrollTop += 12; }
+}, { passive: false });
+// chặn cuộn trang khi đang kéo trên màn cảm ứng
+window.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+document.addEventListener('selectstart', e => { if (drag || hold) e.preventDefault(); });
+app.addEventListener('contextmenu', e => { if (drag || hold) e.preventDefault(); });
+function endDrag(cancel) {
+  cancelHold();
+  if (!drag) return;
+  const { stk, id, target } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 50);
+  target?.classList.remove('swap-target');
+  app.classList.remove('dragging-stk');
+  const key = x => x.dataset.s || 'gio';
+  flip('.stk', key, () => {
+    if (target && !cancel) {
+      const A = DB.get('stickers', id), B = DB.get('stickers', target.dataset.s);
+      if (A && B) {
+        let oa = A.order ?? 0, ob = B.order ?? 0;
+        if (oa === ob) { stickers().forEach((x, i, arr) => { if (x.order !== arr.length - i) { quiet = true; DB.put('stickers', { ...x, order: arr.length - i }); quiet = false; } }); oa = DB.get('stickers', id).order; ob = DB.get('stickers', target.dataset.s).order; }
+        quiet = true; DB.put('stickers', { ...DB.get('stickers', id), order: ob }); DB.put('stickers', { ...DB.get('stickers', target.dataset.s), order: oa }); quiet = false;
+      }
+    }
+    render(true);
+  }, 420);
+}
+window.addEventListener('pointerup', () => endDrag(false));
+window.addEventListener('pointercancel', () => endDrag(true));
+app.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+
+// rời app (chuyển sang app khác) là khóa Tab Đỏ; quay lại Tab Đỏ thì hỏi vân tay lại
+let bioBusy = false, bioEndAt = 0;
+function onLeaveApp() {
+  if (bioBusy || !MK) return;
+  lockVault(); render(true);
+}
+function onBackToApp() {
+  if (bioBusy || Date.now() - bioEndAt < 1500) return;
+  if (S.tab === 3 && !MK && secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false) && !S.dlg) bioUnlock();
+}
+document.addEventListener('visibilitychange', () => document.hidden ? onLeaveApp() : onBackToApp());
+if (P.isDesktop) { window.addEventListener('blur', onLeaveApp); window.addEventListener('focus', onBackToApp); }
 window.addEventListener('resize', () => { const was = S.compact + ':' + S.wide; const w = innerWidth; if (was !== (w < 600) + ':' + (w >= 900)) render(true); });
 
 // dữ liệu đổi từ máy khác
 DB.onChange(async c => {
+  if (quiet) return;
   if (c === 'meta') { const m = secMeta(); if (MK && (!m || m.keyId !== MKID)) { lockVault(); await P.keyClear(); setPref('bioKey', false); } }
   if (c === 'vault' && MK && !S.editAcc) await refreshVault();
   render();
