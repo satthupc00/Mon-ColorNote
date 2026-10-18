@@ -16,7 +16,7 @@ export const sampleNotes = () => [
   { name: 'Blender', t: ago(5), body: '<h4>Retopo nhanh</h4><div>Bật Snap to Face + Shrinkwrap modifier.</div><h4>Phím tắt</h4><div><kbd>Ctrl</kbd>+<kbd>R</kbd> loop cut · <kbd>G</kbd> <kbd>G</kbd> trượt cạnh · <kbd>Shift</kbd>+<kbd>D</kbd> nhân bản.</div>' },
   { name: 'Photoshop', t: ago(9), body: '<h4>Tách layer cho Spine</h4><div>Dùng script LayersToPNG, đặt tên layer không dấu, không khoảng trắng.</div>' },
   { name: 'After Effects', t: ago(16), body: '<h4>Loop mượt</h4><div>Thêm expression loopOut("cycle") cho keyframe vị trí.</div>' }
-].map((x, i) => ({ id: id(), name: x.name, body: x.body, order: i, editedAt: x.t }));
+].map((x, i) => ({ id: id(), name: x.name, body: x.body, order: i, groupId: 'grp-default', editedAt: x.t }));
 
 // Tab Đỏ: nhóm + tài khoản (giả)
 export const sampleVault = () => {

@@ -2,7 +2,7 @@
 // Mỗi mục có updatedAt; bản nào mới hơn thì thắng. Xóa = đánh dấu deleted để máy khác cũng xóa theo.
 import firebaseConfig from './firebase-config.js';
 
-export const COLLS = ['stickers', 'notes', 'vault', 'meta'];
+export const COLLS = ['stickers', 'notes', 'ngroups', 'vault', 'meta'];
 const listeners = new Set();
 export const onChange = fn => listeners.add(fn);
 const emit = (coll) => listeners.forEach(fn => fn(coll));

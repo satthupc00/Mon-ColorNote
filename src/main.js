@@ -31,7 +31,7 @@ const fmtDate = t => {
 const S = {
   tab: pref('tab', 1), theme: pref('theme', 'dark'),
   t2sel: null, t2sort: pref('t2sort', 'manual'), t2open: false, t2new: false,
-  doneOpen: pref('doneOpen', {}),
+  doneOpen: pref('doneOpen', {}), gclosed: pref('gclosed', {}), g2ren: null,
   t3: 'lock', pin: '', pin1: '', pinErr: '', recovery: '', t3g: null, q: '', closed: pref('closed', {}), show: {}, editAcc: null, t3new: false,
   dlg: null, upd: { ev: 'idle' }, version: '', compact: false, wide: false, bio: false, bioOn: pref('bio', true),
   login: { email: '', msg: '', err: false, busy: false }
@@ -41,10 +41,25 @@ let MK = null, MKB64 = null, MKID = null, vaultCache = [], leftTab3At = 0;
 // ---------------- dữ liệu ----------------
 const STK_COLORS = ['y', 'm', 'p', 'l', 's'];
 const stickers = () => DB.all('stickers').sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
-const notes = () => {
-  const n = DB.all('notes');
-  return S.t2sort === 'date' ? n.sort((a, b) => (b.editedAt || 0) - (a.editedAt || 0)) : n.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-};
+// Tab Xanh dương: nhóm cha (ngroups) chứa các ghi chú (notes.groupId)
+const G_DEFAULT = 'grp-default', G_UNSORTED = 'grp-unsorted'; // id cố định để 2 máy không tạo trùng nhóm
+const ngroups = () => DB.all('ngroups').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+const sortNotes = n => S.t2sort === 'date' ? n.sort((a, b) => (b.editedAt || 0) - (a.editedAt || 0)) : n.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+const notesOf = gid => sortNotes(DB.all('notes').filter(n => n.groupId === gid));
+const notes = () => ngroups().flatMap(g => notesOf(g.id));
+// ghi chú cũ chưa có nhóm → vào nhóm "Phần mềm"; nhóm đã bị xóa → "Chưa phân loại"
+function ensureGroups() {
+  const ids = new Set(DB.all('ngroups').map(g => g.id));
+  const lost = DB.all('notes').filter(n => !ids.has(n.groupId));
+  if (!lost.length) return;
+  quiet = true;
+  for (const n of lost) {
+    const gid = n.groupId ? G_UNSORTED : G_DEFAULT;
+    if (!ids.has(gid)) { DB.put('ngroups', { id: gid, name: gid === G_DEFAULT ? 'Phần mềm' : 'Chưa phân loại', order: gid === G_DEFAULT ? 0 : 999 }); ids.add(gid); }
+    DB.put('notes', { ...n, groupId: gid });
+  }
+  quiet = false;
+}
 const secMeta = () => DB.get('meta', 'sec');
 const groups = () => vaultCache.filter(v => v.kind === 'group').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 const accsOf = gid => vaultCache.filter(v => v.kind === 'acc' && v.groupId === gid).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -259,7 +274,7 @@ function flip(sel, keyOf, mutate, dur = 340) {
 }
 const footInfo = () => {
   if (S.tab === 1) { const s = stickers(); return `${s.length} sticker · ${s.reduce((n, x) => n + (x.items || []).filter(i => !i.done).length, 0)} mục chưa xong`; }
-  if (S.tab === 2) return `${DB.all('notes').length} phần mềm`;
+  if (S.tab === 2) return `${ngroups().length} nhóm · ${DB.all('notes').length} ghi chú`;
   return MK ? `${groups().length} nhóm · ${vaultCache.filter(v => v.kind === 'acc').length} thẻ · đã mã hóa` : 'Đã khóa';
 };
 
@@ -345,24 +360,33 @@ function tab1() {
 
 // ---------- Tab 2 ----------
 function tab2() {
-  const list = notes();
+  ensureGroups();
+  const gs = ngroups(), list = notes();
   if (S.t2sel && !DB.get('notes', S.t2sel)) S.t2sel = null;
   if (!S.t2sel && list.length && !S.compact) S.t2sel = list[0].id;
   const manual = S.t2sort === 'manual';
-  const lp = `<div class="lpane"><div class="lhead"><b>Phần mềm</b><button class="ibtn sm" data-act="note-new" title="Thêm phần mềm" aria-label="Thêm phần mềm">${I.plus14}</button></div>
-    <div class="sortseg"><button data-act="sort" data-v="manual" aria-pressed="${manual}">Tự sắp xếp</button><button data-act="sort" data-v="date" aria-pressed="${!manual}">Mới sửa</button></div>
-    ${S.t2new ? `<div class="newname"><input id="newnote" placeholder="Tên phần mềm" enterkeyhint="done"><button class="btn pri" data-act="note-add">Thêm</button></div>` : ''}
-    <div class="list">${list.length ? list.map((a, i) => `<div class="li" data-act="note-pick" data-id="${a.id}" aria-current="${!S.compact && a.id === S.t2sel}">
-      ${manual ? `<span class="grip" title="Giữ rồi kéo để đổi vị trí">${I.grip}</span>` : ''}
+  const noteLi = a => `<div class="li" data-act="note-pick" data-id="${a.id}" aria-current="${!S.compact && a.id === S.t2sel}">
       <span class="dot" style="background:${hue(a.name)}33;color:${hue(a.name)}">${esc((a.name || '?')[0].toUpperCase())}</span>
-      <span class="nm"><b>${esc(a.name)}</b><small>Sửa ${fmtDate(a.editedAt)}</small></span>
-    </div>`).join('') : `<div class="empty" style="padding:24px 8px">Thêm tên phần mềm đầu tiên, ví dụ "Spine 3.7.94".</div>`}</div></div>`;
+      <span class="nm"><b>${esc(a.name)}</b><small>Sửa ${fmtDate(a.editedAt)}</small></span></div>`;
+  const grp = g => {
+    const ns = notesOf(g.id), closed = !!S.gclosed[g.id] && S.t2new !== g.id;
+    return `<section class="ngrp ${closed ? 'closed' : ''}" data-g="${g.id}">
+      <div class="gh"><span class="grip" title="Giữ rồi kéo để đổi vị trí nhóm">${I.grip}</span><button class="chev" data-act="g2-tog" data-g="${g.id}" aria-expanded="${!closed}" aria-label="Thu gọn / mở nhóm">${I.chev}</button>
+        <span class="gname" data-g="${g.id}" ${S.g2ren === g.id ? 'contenteditable="plaintext-only"' : ''} title="Bấm đúp để đổi tên">${esc(g.name)}</span><span class="cnt">${ns.length}</span>
+        <button class="gbtn" data-act="note-new" data-g="${g.id}" title="Thêm ghi chú vào nhóm" aria-label="Thêm ghi chú vào nhóm">${I.plus14}</button><button class="gbtn" data-act="g2-menu" data-g="${g.id}" title="Đổi tên / xóa nhóm" aria-label="Tùy chọn nhóm">${I.dots}</button></div>
+      <div class="gl">${S.t2new === g.id ? `<div class="newname"><input id="newnote" placeholder="Tên ghi chú" enterkeyhint="done"><button class="btn pri" data-act="note-add">Thêm</button></div>` : ''}
+        ${ns.length ? ns.map(noteLi).join('') : S.t2new === g.id ? '' : '<div class="empty-g">Nhóm trống · bấm + để thêm</div>'}</div></section>`;
+  };
+  const lp = `<div class="lpane"><div class="tools2"><button class="addg" data-act="g2-new">${I.plus14}Nhóm mới</button>
+      <div class="sortseg"><button data-act="sort" data-v="manual" aria-pressed="${manual}">Tự xếp</button><button data-act="sort" data-v="date" aria-pressed="${!manual}">Mới sửa</button></div></div>
+    <div class="list tree">${gs.length ? gs.map(grp).join('') : `<div class="empty" style="padding:24px 8px">Bấm "Nhóm mới" để tạo nhóm đầu tiên, ví dụ "Phần mềm".</div>`}</div></div>`;
   const cur = S.t2sel && DB.get('notes', S.t2sel);
+  const cg = cur && DB.get('ngroups', cur.groupId);
   const dp = cur ? `<div class="dpane"><div class="dhead">${S.compact ? `<button class="back" data-act="back2" aria-label="Quay lại">${I.back}</button>` : ''}
-      <h2 contenteditable="plaintext-only" data-edit="note-name">${esc(cur.name)}</h2><button class="more" data-act="note-menu" aria-label="Tùy chọn" title="Xóa">${I.dots}</button></div>
+      <div style="flex:1;min-width:0"><div class="crumb">${esc(cg ? cg.name : '')}</div><h2 contenteditable="plaintext-only" data-edit="note-name">${esc(cur.name)}</h2></div><button class="more" data-act="note-menu" aria-label="Tùy chọn" title="Chuyển nhóm / xóa">${I.dots}</button></div>
       <div class="meta">Sửa lần cuối ${fmtDate(cur.editedAt)} · tự lưu</div>
       <div class="editor" contenteditable="true" spellcheck="false" data-edit="note-body">${paint(clean(cur.body))}</div></div>`
-    : `<div class="dpane"><div class="empty"><b>Chọn một phần mềm</b>Hoặc bấm + để thêm mới.</div></div>`;
+    : `<div class="dpane"><div class="empty"><b>Chọn một ghi chú</b>Hoặc bấm + trên dòng tên nhóm để thêm mới.</div></div>`;
   if (S.compact) return `<div class="ld">${S.t2open && cur ? dp : lp}</div>`;
   return `<div class="ld">${lp}${dp}</div>`;
 }
@@ -654,13 +678,37 @@ app.addEventListener('click', async e => {
     }
     // tab 2
     case 'sort': S.t2sort = d.v; setPref('t2sort', d.v); break;
-    case 'note-new': S.t2new = true; S.t2open = false; render(true); document.getElementById('newnote')?.focus(); return;
+    case 'note-new': {
+      ensureGroups();
+      const gid = d.g || S.t2new || (DB.get('notes', S.t2sel) || {}).groupId || (ngroups()[0] || {}).id;
+      if (!gid) { toast('Tạo một nhóm trước nhé'); return; }
+      S.t2new = gid; S.t2open = false; render(true); document.getElementById('newnote')?.focus(); return;
+    }
+    case 'g2-tog': S.gclosed[d.g] = !S.gclosed[d.g]; setPref('gclosed', S.gclosed); flip('.ngrp,.li', x => x.dataset.g || x.dataset.id, () => render(true), 220); return;
+    case 'g2-new': {
+      const order = Math.min(0, ...ngroups().map(g => g.order ?? 0)) - 1;
+      const g = DB.put('ngroups', { id: DB.uid(), name: 'Nhóm mới', order });
+      S.g2ren = g.id; render(true); startRename(); return;
+    }
+    case 'g2-menu': {
+      const g = DB.get('ngroups', d.g);
+      popover(el, `<button class="mi" data-r="1">${I.pen}Đổi tên</button><button class="mi danger" data-del="1">${I.trash}Xóa nhóm</button>`, o => {
+        if (o.r) { S.g2ren = g.id; render(true); startRename(); }
+        if (o.del) confirmDlg('Xóa nhóm?', `Nhóm "${g.name}" sẽ bị xóa. ${notesOf(g.id).length} ghi chú bên trong được chuyển về nhóm "Chưa phân loại".`, 'Xóa nhóm', () => {
+          DB.remove('ngroups', g.id); if (S.t2new === g.id) S.t2new = false; render(true); toast('Đã xóa nhóm');
+        });
+      });
+      return;
+    }
+
     case 'note-add': addNote(); return;
     case 'note-pick': S.t2sel = d.id; S.t2open = true; break;
     case 'back2': S.t2open = false; break;
     case 'note-menu': {
-      const n = DB.get('notes', S.t2sel);
-      popover(el, `<button class="mi danger" data-del="1">${I.trash}Xóa "${esc(n.name)}"</button>`, () => confirmDlg('Xóa ghi chú?', `Ghi chú "${n.name}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { (n.body || '').replace(/data-img="([^"]+)"/g, (_, id) => IMG.remove(id)); DB.remove('notes', n.id); S.t2sel = null; S.t2open = false; render(true); }));
+      const n = DB.get('notes', S.t2sel), others = ngroups().filter(g => g.id !== n.groupId);
+      popover(el, `${others.length ? `<button class="mi" data-mv="1">${I.move}Chuyển sang nhóm…</button>` : ''}<button class="mi danger" data-del="1">${I.trash}Xóa "${esc(n.name)}"</button>`, o => o.mv
+        ? setTimeout(() => popover(el, `<div class="pop-t">Chuyển "${esc(n.name)}" sang</div>${others.map(g => `<button class="mi" data-g="${g.id}">${esc(g.name)}</button>`).join('')}`, o2 => o2.g && moveNote(n.id, o2.g)))
+        : confirmDlg('Xóa ghi chú?', `Ghi chú "${n.name}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { (n.body || '').replace(/data-img="([^"]+)"/g, (_, id) => IMG.remove(id)); DB.remove('notes', n.id); S.t2sel = null; S.t2open = false; render(true); }));
       return;
     }
     // tab 3
@@ -736,11 +784,12 @@ app.addEventListener('click', async e => {
 });
 
 function addNote() {
-  const i = document.getElementById('newnote'), name = (i && i.value.trim()) || '';
+  const i = document.getElementById('newnote'), name = (i && i.value.trim()) || '', gid = S.t2new;
   S.t2new = false;
-  if (name) {
-    const order = Math.min(0, ...DB.all('notes').map(n => n.order ?? 0)) - 1;
-    const n = DB.put('notes', { id: DB.uid(), name, body: '', order, editedAt: Date.now() });
+  if (name && gid) {
+    const order = Math.min(0, ...notesOf(gid).map(n => n.order ?? 0)) - 1;
+    const n = DB.put('notes', { id: DB.uid(), name, body: '', order, groupId: gid, editedAt: Date.now() });
+    S.gclosed[gid] = false; setPref('gclosed', S.gclosed);
     S.t2sel = n.id; S.t2open = true;
   }
   render(true);
@@ -796,6 +845,7 @@ app.addEventListener('keydown', e => {
   }
   if ((t.dataset.edit === 'stk-title' || t.dataset.edit === 'it' || t.dataset.edit === 'note-name') && e.key === 'Enter') { e.preventDefault(); t.blur(); }
   if (t.id === 'newnote' && e.key === 'Enter') addNote();
+  if (t.classList && t.classList.contains('gname') && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); if (e.key === 'Escape') t.textContent = (DB.get('ngroups', t.dataset.g) || {}).name || ''; t.blur(); }
   if (t.id === 'newnote' && e.key === 'Escape') { S.t2new = false; render(true); }
   if (t.id === 'dlgin' && e.key === 'Enter') app.querySelector('[data-act="dlg-ok"]').click();
   if (t.id === 'reccode' && e.key === 'Enter') app.querySelector('[data-act="rec-unlock"]').click();
@@ -803,6 +853,7 @@ app.addEventListener('keydown', e => {
 });
 app.addEventListener('focusout', e => {
   const t = e.target;
+  if (t.classList.contains('gname') && S.g2ren) { const g = DB.get('ngroups', t.dataset.g); S.g2ren = null; if (g) DB.put('ngroups', { ...g, name: t.textContent.trim() || 'Nhóm mới' }); setTimeout(() => render(true)); return; }
   // xóa mục trống khi rời ô
   if (t.dataset.edit === 'it' && !t.textContent.trim()) { const r = t.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); }
   setTimeout(() => { if (pendingRender && !editing()) render(true); }, 750);
@@ -834,13 +885,15 @@ let hold = null, drag = null, eatClick = false;
 const SORTS = [
   { item: '.stk', box: '.wall', key: el => el.dataset.s || 'gio', ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
   { item: '.acc[data-id]', box: '.acc-wrap', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK && !S.editAcc && !S.q, save: ids => saveAccOrder(ids) },
-  { item: '.li[data-act="note-pick"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 2, save: ids => saveNoteOrder(ids), list: true },
+  { item: '.li[data-act="note-pick"]', box: '.tree', key: el => el.dataset.id, ok: () => S.tab === 2 && !S.g2ren, save: () => saveNoteTree(), list: true, vertical: true },
+  { item: '.ngrp', handle: '.gh', box: '.tree', key: el => el.dataset.g, ok: () => S.tab === 2 && !S.g2ren, save: ids => saveNGroupOrder(ids), list: true, vertical: true },
   { item: '.li[data-act="g"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK, save: ids => saveGroupOrder(ids), list: true }
 ];
 app.addEventListener('pointerdown', e => {
   if (e.button > 0 || e.target.closest('input,button,.pop,.ov')) return;
   for (const cfg of SORTS) {
     const el = e.target.closest(cfg.item);
+    if (el && cfg.handle && !e.target.closest(cfg.handle)) continue;
     // PC + danh sách tab con: nhấn giữ chuột rồi kéo là đi luôn (m-skill: di chuột > 4px); còn lại: giữ ~0.3s
     if (el && cfg.ok()) { const quick = cfg.list && e.pointerType === 'mouse'; hold = { cfg, el, quick, x: e.clientX, y: e.clientY, t: quick ? 0 : setTimeout(startDrag, HOLD_MS) }; return; }
   }
@@ -861,7 +914,7 @@ function follow() {
   const el = drag.el; el.style.translate = '0 0';
   const r = el.getBoundingClientRect();
   // điện thoại / danh sách 1 cột: chỉ kéo lên xuống
-  const dx = S.compact || drag.cfg.box === '.list' ? 0 : drag.px - drag.offX - r.left;
+  const dx = S.compact || drag.cfg.box === '.list' || drag.cfg.vertical ? 0 : drag.px - drag.offX - r.left;
   el.style.translate = `${dx}px ${drag.py - drag.offY - r.top}px`;
 }
 window.addEventListener('pointermove', e => {
@@ -872,9 +925,11 @@ window.addEventListener('pointermove', e => {
   const sc = drag.scroller, sr = sc && sc.getBoundingClientRect();
   if (sr) { if (e.clientY < sr.top + 50) sc.scrollTop -= 12; else if (e.clientY > sr.bottom - 50) sc.scrollTop += 12; }
   // màn 1 cột: dò theo trục dọc ở giữa cột để kéo lệch ngang vẫn nhận đúng chỗ
-  const vertical = S.compact || drag.cfg.box === '.list';
+  const vertical = S.compact || drag.cfg.box === '.list' || drag.cfg.vertical;
   const bx = vertical ? drag.box.getBoundingClientRect().left + drag.box.clientWidth / 2 : e.clientX;
-  const over = document.elementFromPoint(bx, e.clientY)?.closest(drag.cfg.item);
+  const under = document.elementFromPoint(bx, e.clientY);
+  let over = under?.closest(drag.cfg.item);
+  if (over && drag.cfg.item === '.ngrp' && drag.el.contains(over)) over = null;
   if (over && over !== drag.el && over !== drag.last && drag.box.contains(over)) {
     drag.last = over;
     const sibs = [...drag.box.querySelectorAll(drag.cfg.item)];
@@ -887,6 +942,12 @@ window.addEventListener('pointermove', e => {
       if (Math.abs(dx) > .5 || Math.abs(dy) > .5) x.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 260, easing: EASE });
     }
   } else if (!over) drag.last = null;
+  // ghi chú thả lên tên nhóm khác → vào cuối nhóm đó (kể cả nhóm đang thu gọn / trống)
+  if (drag.cfg.item.startsWith('.li[data-act="note-pick"]')) {
+    const gh = under?.closest('.gh'), sec = gh?.parentNode;
+    const tg = sec && !sec.contains(drag.el) ? sec : null;
+    if (tg !== drag.grp) { drag.grp?.classList.remove('drop-target'); tg?.classList.add('drop-target'); drag.grp = tg; }
+  }
   if (drag.cfg.item === '.acc[data-id]') {
     const g = document.elementFromPoint(e.clientX, e.clientY)?.closest('.lpane .li[data-act="g"]');
     const tg = g && g.dataset.id !== S.t3g ? g : null;
@@ -902,7 +963,7 @@ function endDrag() {
   if (!drag) return;
   const { cfg, el, box, grp } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 60);
   app.classList.remove('dragging-stk');
-  if (grp) { grp.classList.remove('drop-target'); return moveAcc(el.dataset.id, grp.dataset.id); }
+  if (grp) { grp.classList.remove('drop-target'); el.classList.remove('lift'); el.style.translate = ''; return grp.dataset.g ? moveNote(el.dataset.id, grp.dataset.g) : moveAcc(el.dataset.id, grp.dataset.id); }
   const ids = [...box.querySelectorAll(cfg.item)].map(cfg.key);
   // mục đang kéo bay về chỗ mới
   const k = cfg.key(el);
@@ -938,6 +999,25 @@ function moveAcc(id, gid) {
   a.groupId = gid; a.order = accsOf(gid).length; saveVault(a);
   render(true); toast(`Đã chuyển "${a.title}" sang ${g.name}`);
 }
+// đọc lại cây trên màn hình: nhóm nào chứa ghi chú nào, theo thứ tự nào
+function saveNoteTree() {
+  if (S.t2sort !== 'manual') { S.t2sort = 'manual'; setPref('t2sort', 'manual'); }
+  quiet = true;
+  app.querySelectorAll('.tree .ngrp').forEach(sec => {
+    const gid = sec.dataset.g;
+    sec.querySelectorAll('.li[data-act="note-pick"]').forEach((li, i) => { const n = DB.get('notes', li.dataset.id); if (n && (n.order !== i || n.groupId !== gid)) DB.put('notes', { ...n, order: i, groupId: gid }); });
+  });
+  quiet = false;
+}
+function saveNGroupOrder(ids) {
+  quiet = true; ids.forEach((id, i) => { const g = DB.get('ngroups', id); if (g && g.order !== i) DB.put('ngroups', { ...g, order: i }); }); quiet = false;
+}
+function moveNote(id, gid) {
+  const n = DB.get('notes', id), g = DB.get('ngroups', gid); if (!n || !g) return render(true);
+  quiet = true; DB.put('notes', { ...n, groupId: gid, order: Math.max(-1, ...notesOf(gid).map(x => x.order ?? 0)) + 1 }); quiet = false;
+  S.gclosed[gid] = false; setPref('gclosed', S.gclosed);
+  parts['p-main'] = null; render(true); toast(`Đã chuyển "${n.name}" sang ${g.name}`);
+}
 function saveNoteOrder(ids) {
   if (S.t2sort !== 'manual') { S.t2sort = 'manual'; setPref('t2sort', 'manual'); }
   quiet = true;
@@ -969,6 +1049,8 @@ DB.onChange(async c => {
 });
 DB.onAuth(u => { if (u) IMG.uploadPending(); render(true); });
 // bấm đúp vào hình trong ghi chú để xem lớn
+app.addEventListener('dblclick', e => { const gn = e.target.closest('.gname'); if (gn && !S.g2ren) { S.g2ren = gn.dataset.g; render(true); startRename(); } });
+function startRename() { const el = app.querySelector('.gname[contenteditable]'); if (!el) return; el.focus(); getSelection().selectAllChildren(el); }
 app.addEventListener('dblclick', e => { const im = e.target.closest('.editor img[src]'); if (im) { S.dlg = { type: 'img', src: im.src }; render(true); } });
 
 // cập nhật

@@ -396,3 +396,32 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .upd-ic{width:56px;height:56px;margin:4px auto 10px;border-radius:18px;background:rgba(46,184,114,.15);color:var(--ok);display:grid;place-items:center}
 .upd-ic svg{width:28px;height:28px}
 .upd-dlg .acts{justify-content:center}
+
+/* ---- Tab Xanh dương: nhóm cha ---- */
+.tools2{display:flex;gap:8px;padding:14px 12px 8px;align-items:center}
+.addg{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--line);background:none;color:var(--mu);border-radius:12px;padding:8px;font-weight:800;font-size:12.5px;white-space:nowrap}
+.addg:hover{border-color:var(--red);color:var(--red)}
+.tools2 .sortseg{margin:0}
+.tree{padding:4px 8px 90px}
+.ngrp{margin-bottom:6px;border-radius:14px}
+.gh{display:flex;align-items:center;gap:4px;padding:6px 4px 6px 2px;border-radius:12px;cursor:grab}
+.gh:hover{background:var(--hov)}
+.gh .grip{color:var(--mu);opacity:.5;padding:0 2px;display:grid}
+.chev{width:24px;height:24px;border:0;background:none;color:var(--mu);border-radius:8px;display:grid;place-items:center;transition:rotate var(--t-med) var(--ease-out)}
+.ngrp.closed .chev{rotate:-90deg}
+.gname{flex:1;min-width:0;font:800 12px/1.2 var(--f-ui);text-transform:uppercase;letter-spacing:.06em;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;border-radius:6px;padding:2px 4px}
+.gname[contenteditable]{background:var(--surf);color:var(--tx);text-transform:none;letter-spacing:0;font-size:13px;box-shadow:0 0 0 2px var(--red);cursor:text;user-select:text;text-overflow:clip}
+.cnt{font-size:11px;font-weight:800;color:var(--mu);background:var(--surf2);border-radius:20px;padding:0 7px}
+.gbtn{width:26px;height:26px;border:0;background:none;color:var(--mu);border-radius:8px;display:grid;place-items:center;opacity:0}
+.gh:hover .gbtn,.touch .gbtn,.gbtn:focus-visible{opacity:1}
+.gbtn:hover{color:var(--red);background:var(--surf2)}
+.gl{display:grid;gap:2px;padding-left:12px;margin-left:12px;border-left:1.5px solid var(--line);min-height:6px}
+.ngrp.closed .gl{display:none}
+.gl .newname{margin:4px 0}
+.empty-g{color:var(--mu);font-size:12px;padding:6px 10px;font-style:italic}
+.ngrp.lift{scale:1.03;z-index:50;position:relative;pointer-events:none;background:var(--surf);box-shadow:0 10px 24px rgba(0,0,0,.45),0 0 0 2px var(--red);transition:scale var(--t-med) var(--ease-spring)}
+.ngrp.drop-target>.gh{background:var(--sel);box-shadow:inset 0 0 0 2px var(--red)}
+.crumb{font-size:11.5px;color:var(--mu);font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:0 4px}
+
+.ld .lpane:has(.tree){width:276px}
+.tools2 .sortseg button{padding:5px 7px;white-space:nowrap}
