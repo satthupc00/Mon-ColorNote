@@ -32,7 +32,7 @@ export const sampleVault = () => {
   const out = [];
   g.forEach(([name, accs], gi) => {
     const gid = id(); out.push({ id: gid, kind: 'group', name: name + ' (mẫu)', order: 100 + gi });
-    accs.forEach(([title, f], ai) => out.push({ id: id(), kind: 'acc', groupId: gid, title, order: ai, fields: f.map(([k, v, s]) => ({ k, v, secret: !!s })) }));
+    accs.forEach(([title, f], ai) => out.push({ id: id(), kind: 'acc', groupId: gid, title, order: ai, body: f.map(([k, v]) => `${k}: ${v}`).join('\n') }));
   });
   return out;
 };

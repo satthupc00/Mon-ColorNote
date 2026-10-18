@@ -346,3 +346,28 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .pw .ibtn.go{background:var(--red);color:#fff}
 .pw .ibtn.go:hover{background:#F04447;box-shadow:0 6px 16px rgba(229,56,59,.35)}
 .pw.shake{animation:shake .4s}
+
+/* ---- Tab Đỏ: thẻ tiêu đề + nội dung tự do ---- */
+.acc-h .av{width:30px;height:30px;border-radius:10px;background:var(--r-soft);color:var(--red);display:grid;place-items:center;font:800 13px var(--f-disp);flex:0 0 auto}
+.acc-h .acc-t{flex:1;min-width:0;font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-h{gap:8px;padding:10px 8px 10px 14px}
+.acc-h:hover{background:none}
+.eye{width:34px;height:34px;border-radius:10px;border:0;background:none;color:var(--mu);display:grid;place-items:center;flex:0 0 auto}
+.eye:hover{color:var(--red);background:var(--surf2)}
+.eye[aria-pressed="true"]{color:var(--red);background:var(--sel)}
+.acc-b{padding:8px 10px 10px}
+.acc-b .ln{padding:3px 4px;white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.6}
+.acc-b .ln.blank{height:8px;padding:0}
+.acc-b .ln.muted{color:var(--mu)}
+.acc-b.reveal .ln{animation:rise .3s var(--ease-out) both}
+.tok{border-radius:6px;padding:1px 2px;margin:0 -2px;cursor:copy;transition:background-color var(--t-fast),color var(--t-fast);user-select:text}
+.tok:hover{background:rgba(229,56,59,.14);color:var(--red)}
+.tok.copied{animation:tokflash .6s var(--ease-out)}
+@keyframes tokflash{0%{background:var(--red);color:#fff}100%{background:transparent}}
+.mask{display:grid;gap:7px;padding:4px 4px 2px}
+.mask i{display:block;height:10px;border-radius:6px;background:repeating-linear-gradient(90deg,var(--surf2) 0 10px,var(--line) 10px 14px)}
+.mask small{color:var(--mu);font-size:11.5px;font-weight:700;margin-top:2px}
+.acc-edit textarea.field{min-height:140px;resize:vertical;font:600 13.5px/1.6 var(--f-ui);user-select:text;width:100%}
+/* kéo thẻ (m-skill §9) */
+.acc.lift{scale:1.04;z-index:50;position:relative;pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.45),0 0 0 2px var(--red);transition:scale var(--t-med) var(--ease-spring)}
+.acc{cursor:grab}

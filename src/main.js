@@ -143,7 +143,7 @@ function flip(sel, keyOf, mutate, dur = 340) {
 const footInfo = () => {
   if (S.tab === 1) { const s = stickers(); return `${s.length} sticker · ${s.reduce((n, x) => n + (x.items || []).filter(i => !i.done).length, 0)} mục chưa xong`; }
   if (S.tab === 2) return `${DB.all('notes').length} phần mềm`;
-  return MK ? `${groups().length} nhóm · ${vaultCache.filter(v => v.kind === 'acc').length} tài khoản · đã mã hóa` : 'Đã khóa';
+  return MK ? `${groups().length} nhóm · ${vaultCache.filter(v => v.kind === 'acc').length} thẻ · đã mã hóa` : 'Đã khóa';
 };
 
 // Góc phải trên (m-skill §2b): [chấm đồng bộ] [cài đặt] [cập nhật]
@@ -174,7 +174,7 @@ function header() {
   </header>`;
 }
 const TAB_TIPS = ['', 'Sticker việc cần làm (Ctrl+1)', 'Ghi chú phần mềm (Ctrl+2)', 'Tài khoản bảo mật (Ctrl+3)'];
-const tabs = () => [1, 2, 3].map(t => `<button class="tabbtn" data-t="${t}" data-act="tab" aria-selected="${S.tab === t}" aria-label="${TAB_TIPS[t]}" title="${TAB_TIPS[t]}">${t === 3 ? `<span class="lk">${MK ? I.unlock : I.lock}</span>` : ''}</button>`).join('');
+const tabs = () => [1, 2, 3].map(t => `<button class="tabbtn" data-t="${t}" data-act="tab" aria-selected="${S.tab === t}" aria-label="${TAB_TIPS[t]}" title="${TAB_TIPS[t]}"></button>`).join('');
 
 function fabHtml() {
   if (S.tab === 1 && !S.wide) return `<button class="fab" data-act="stk-new" aria-label="Sticker mới">${I.plus}</button>`;
@@ -315,33 +315,35 @@ function tab3() {
   const q = S.q.trim().toLowerCase();
   const list = g ? accsOf(g.id).filter(a => !q || (a.title || '').toLowerCase().includes(q) || a.id === S.editAcc) : [];
   const hl = t => { t = t || ''; const i = q ? t.toLowerCase().indexOf(q) : -1; return i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length)); };
-  const card = (a, k) => {
+  const card = a => {
     if (S.editAcc === a.id) return accEditor(a);
-    const closed = !!S.closed[a.id];
-    return `<div class="acc ${closed ? 'closed' : ''}${enter('a' + a.id)}" style="animation-delay:${Math.min(k, 8) * 50}ms" data-id="${a.id}">
-      <div class="acc-h"><button class="acc-tg" data-act="tog" data-id="${a.id}" aria-expanded="${!closed}"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b>${hl(a.title)}</b><span class="chev">${I.chev}</span></button>
-      <button class="more" data-act="acc-menu" data-id="${a.id}" title="Sửa / xóa" aria-label="Tùy chọn tài khoản">${I.dots}</button></div>
-      <div class="acc-b">${(a.fields || []).map((f, fi) => { const sk = a.id + ':' + fi; return `<div class="kv"><span title="${esc(f.k)}">${esc(f.k)}</span><code>${f.secret && !S.show[sk] ? '••••••••' : esc(f.v)}</code>
-        ${f.secret ? `<button data-act="eye" data-k="${sk}" title="Hiện / ẩn" aria-label="Hiện hoặc ẩn">${S.show[sk] ? I.eyeOff : I.eye}</button>` : ''}<button data-act="copy-f" data-id="${a.id}" data-f="${fi}" title="Copy" aria-label="Copy">${I.copy}</button></div>`; }).join('') || '<div class="kv"><span>Trống</span></div>'}</div></div>`;
+    const on = !!S.show[a.id], lines = accBody(a).split('\n');
+    // hiện: mỗi cụm chữ liền nhau là 1 ô bấm để copy; ẩn: mỗi dòng thành 1 thanh mờ
+    const shown = lines.map(l => l.trim() ? `<div class="ln">${l.split(/(\s+)/).map(w => w.trim() ? `<span class="tok" data-act="tok" title="Bấm để copy">${esc(w)}</span>` : esc(w)).join('')}</div>` : '<div class="ln blank"></div>').join('');
+    const masked = `<div class="mask">${lines.filter(l => l.trim()).map(l => `<i style="width:${Math.min(100, 22 + l.length * 2.6)}%"></i>`).join('') || '<i style="width:30%"></i>'}<small>Nội dung đang ẩn</small></div>`;
+    return `<div class="acc${enter('a' + a.id)}" data-id="${a.id}">
+      <div class="acc-h"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b class="acc-t">${hl(a.title)}</b>
+      <button class="eye" data-act="eye" data-id="${a.id}" aria-pressed="${on}" title="${on ? 'Ẩn nội dung' : 'Hiện nội dung'}" aria-label="${on ? 'Ẩn nội dung' : 'Hiện nội dung'}">${on ? I.eyeOff : I.eye}</button>
+      <button class="more" data-act="acc-menu" data-id="${a.id}" title="Sửa / xóa" aria-label="Tùy chọn thẻ">${I.dots}</button></div>
+      <div class="acc-b${on ? ' reveal' : ''}">${on ? (accBody(a).trim() ? shown : '<div class="ln muted">Trống</div>') : masked}</div></div>`;
   };
   const body = `<div class="dpane">
-    ${S.compact ? `<div class="chips">${gs.map(x => `<button class="chip" data-act="g" data-id="${x.id}" aria-pressed="${x.id === S.t3g}">${esc(x.name)}</button>`).join('')}<button class="chip" data-act="g-new" aria-label="Thêm nhóm" title="Thêm nhóm">${I.plus14}</button>${g ? `<button class="chip" data-act="g-menu" data-id="${g.id}" aria-label="Đổi tên hoặc xóa nhóm" title="Đổi tên / xóa nhóm">${I.dots}</button>` : ''}<button class="chip" data-act="lock" aria-label="Khóa lại" title="Khóa lại">${I.lock16}</button></div>` : ''}
+    ${S.compact ? `<div class="chips">${gs.map(x => `<button class="chip" data-act="g" data-id="${x.id}" aria-pressed="${x.id === S.t3g}">${esc(x.name)}</button>`).join('')}<button class="chip" data-act="g-new" aria-label="Thêm nhóm" title="Thêm nhóm">${I.plus14}</button>${g ? `<button class="chip" data-act="g-menu" data-id="${g.id}" aria-label="Đổi tên hoặc xóa nhóm" title="Đổi tên / xóa nhóm">${I.dots}</button>` : ''}</div>` : ''}
     ${g ? `<div class="search">${I.search}<input id="q3" placeholder="Tìm tiêu đề trong ${esc(g.name)}…" value="${esc(S.q)}" autocomplete="off"></div>
-    <div class="scroll"><div class="acc-wrap">${list.length ? list.map(card).join('') : `<div class="empty">${q ? `Không có tiêu đề nào khớp "${esc(S.q)}"` : '<b>Nhóm còn trống</b>Bấm + để thêm tài khoản.'}</div>`}</div></div>`
+    <div class="scroll"><div class="acc-wrap">${list.length ? list.map(card).join('') : `<div class="empty">${q ? `Không có tiêu đề nào khớp "${esc(S.q)}"` : '<b>Nhóm còn trống</b>Bấm + để thêm thẻ.'}</div>`}</div></div>`
       : `<div class="empty"><b>Tạo nhóm đầu tiên</b>Ví dụ: Mạng xã hội, Công việc, Ngân hàng.<br><br><button class="btn pri" data-act="g-new">${I.plus14}Thêm nhóm</button></div>`}
   </div>`;
   if (S.compact) return `<div class="ld">${body}</div>`;
-  return `<div class="ld"><div class="lpane"><div class="lhead"><b>Nhóm</b><button class="ibtn sm" data-act="g-new" title="Thêm nhóm" aria-label="Thêm nhóm">${I.plus14}</button><button class="ibtn sm" data-act="lock" title="Khóa lại" aria-label="Khóa lại">${I.lock16}</button></div>
-    <div class="list">${gs.map(x => `<div class="li" data-act="g" data-id="${x.id}" aria-current="${x.id === S.t3g}"><span class="dot" style="background:var(--r-soft);color:var(--red)">${esc((x.name || '?')[0].toUpperCase())}</span><span class="nm"><b>${esc(x.name)}</b><small>${accsOf(x.id).length} tài khoản</small></span><button class="more" data-act="g-menu" data-id="${x.id}" aria-label="Tùy chọn nhóm">${I.dots}</button></div>`).join('')}</div></div>${body}</div>`;
+  return `<div class="ld"><div class="lpane"><div class="lhead"><b>Nhóm</b><button class="ibtn sm" data-act="g-new" title="Thêm nhóm" aria-label="Thêm nhóm">${I.plus14}</button></div>
+    <div class="list">${gs.map(x => `<div class="li" data-act="g" data-id="${x.id}" aria-current="${x.id === S.t3g}"><span class="dot" style="background:var(--r-soft);color:var(--red)">${esc((x.name || '?')[0].toUpperCase())}</span><span class="nm"><b>${esc(x.name)}</b><small>${accsOf(x.id).length} thẻ</small></span><button class="more" data-act="g-menu" data-id="${x.id}" aria-label="Tùy chọn nhóm">${I.dots}</button></div>`).join('')}</div></div>${body}</div>`;
 }
+// nội dung thẻ: dữ liệu cũ dạng từng ô (fields) tự chuyển thành các dòng "Tên: giá trị"
+const accBody = a => a.body ?? (a.fields || []).filter(f => f.k || f.v).map(f => f.k ? `${f.k}: ${f.v}` : f.v).join('\n');
 function accEditor(a) {
-  const f = a.fields || [];
   return `<div class="acc" data-id="${a.id}"><div class="acc-edit" id="accedit">
     <input class="field" data-ae="title" value="${esc(a.title)}" placeholder="Tiêu đề, ví dụ: Gmail công việc" style="font-weight:800">
-    ${f.map((x, i) => `<div class="row2" data-fi="${i}"><input class="field" data-ae="k" value="${esc(x.k)}" placeholder="Tên mục"><input class="field" data-ae="v" value="${esc(x.v)}" placeholder="Giá trị">
-      <label class="sec" title="Che giá trị"><input type="checkbox" data-ae="s" ${x.secret ? 'checked' : ''}>Ẩn</label><button class="more" data-act="ae-delf" data-fi="${i}" aria-label="Xóa dòng">${I.x14}</button></div>`).join('')}
-    <div class="acts"><button class="btn ghost" data-act="ae-addf">${I.plus14}Thêm dòng</button><span class="sp"></span>
-      ${S.t3new ? '' : `<button class="btn ghost danger" data-act="acc-del" data-id="${a.id}">Xóa</button>`}<button class="btn" data-act="ae-cancel">Hủy</button><button class="btn pri" data-act="ae-save">Lưu</button></div>
+    <textarea class="field" data-ae="body" placeholder="Nội dung: tài khoản, mật khẩu, ghi chú…" spellcheck="false">${esc(accBody(a))}</textarea>
+    <div class="acts">${S.t3new ? '' : `<button class="btn ghost danger" data-act="acc-del" data-id="${a.id}">Xóa</button>`}<span class="sp"></span><button class="btn" data-act="ae-cancel">Hủy</button><button class="btn pri" data-act="ae-save">Lưu</button></div>
   </div></div>`;
 }
 
@@ -373,6 +375,7 @@ function settings() {
       <div class="row"><div class="t"><b>Mở bằng vân tay</b><small>${S.bio ? (P.isDesktop ? 'Windows Hello' : 'Cảm biến vân tay') : 'Máy này không có cảm biến, sẽ hỏi PIN'}</small></div><button class="sw" role="switch" aria-checked="${S.bio && S.bioOn}" data-act="bio-tog" ${S.bio ? '' : 'disabled'} aria-label="Mở bằng vân tay"></button></div>
       ${P.isDesktop ? `<div class="row"><div class="t"><b>Tự khóa khi chuyển sang app khác</b><small>Tắt: chỉ khóa khi đóng hẳn app hoặc bấm nút khóa</small></div><button class="sw" role="switch" aria-checked="${pref('pcAutoLock', false)}" data-act="autolock-tog" aria-label="Tự khóa"></button></div>`
         : `<div class="row"><div class="t"><b>Tự khóa lại</b><small>Khi chuyển sang app khác, hoặc sau 1 phút rời Tab Đỏ</small></div></div>`}
+      ${MK ? `<div class="row"><div class="t"><b>Khóa Tab Đỏ ngay</b><small>Phím tắt Ctrl+L</small></div><button class="btn ghost" data-act="lock-now">Khóa</button></div>` : ''}
       <div class="row"><div class="t"><b>Đổi ${PW()}</b><small>${MK ? 'Cần két đang mở' : 'Mở Tab Đỏ trước rồi đổi'}</small></div><button class="btn ghost" data-act="chpin" ${MK ? '' : 'disabled'}>Đổi</button></div></div>
     <div class="grp-t">Dữ liệu mẫu</div><div class="grp"><div class="row"><div class="t"><b>Thêm dữ liệu mẫu</b><small>Sticker, ghi chú phần mềm${MK ? ' và tài khoản giả ở Tab Đỏ' : '. Mở Tab Đỏ trước nếu muốn thêm cả tài khoản giả'}</small></div><button class="btn ghost" data-act="sample">Thêm</button></div></div>
     <div class="grp-t">Phiên bản</div><div class="grp"><div class="row"><div class="t"><b>Mon TriNote ${esc(S.version)} · ${P.platformName}</b><small>${esc(updTxt)}</small></div>
@@ -400,8 +403,11 @@ function popover(anchor, html, onClick) {
 const outside = e => { if (!e.target.closest('.pop')) closePop(); };
 function closePop() { app.querySelectorAll('.pop').forEach(p => p.remove()); document.removeEventListener('pointerdown', outside, true); }
 async function copy(text) {
-  try { await navigator.clipboard.writeText(text); toast('Đã copy'); }
-  catch { toast('Không copy được'); }
+  const label = text.length > 30 ? text.slice(0, 30) + '…' : text;
+  try { await navigator.clipboard.writeText(text); toast('Đã copy: ' + label); return; } catch {}
+  // dự phòng cho webview không cho dùng clipboard API
+  const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select();
+  const ok = document.execCommand('copy'); t.remove(); toast(ok ? 'Đã copy: ' + label : 'Không copy được');
 }
 const confirmDlg = (title, text, ok, fn) => { S.dlg = { type: 'confirm', title, text, ok, fn }; render(true); };
 const promptDlg = (title, value, ph, fn) => { S.dlg = { type: 'prompt', title, value, ph, fn }; render(true); setTimeout(() => { const i = document.getElementById('dlgin'); i && (i.focus(), i.select()); }, 50); };
@@ -479,9 +485,8 @@ async function bioUnlock() {
 function collectAccEditor() {
   const box = document.getElementById('accedit'); if (!box) return null;
   const a = vaultCache.find(v => v.id === S.editAcc) || S.newAcc;
-  const n = { ...a, title: box.querySelector('[data-ae="title"]').value.trim(), fields: [] };
-  box.querySelectorAll('.row2').forEach(r => n.fields.push({ k: r.querySelector('[data-ae="k"]').value.trim(), v: r.querySelector('[data-ae="v"]').value, secret: r.querySelector('[data-ae="s"]').checked }));
-  return n;
+  const { fields, ...rest } = a;
+  return { ...rest, title: box.querySelector('[data-ae="title"]').value.trim(), body: box.querySelector('[data-ae="body"]').value };
 }
 
 // ---------------- sự kiện ----------------
@@ -493,6 +498,7 @@ app.addEventListener('click', async e => {
     case 'tab': {
       const t = +d.t; if (S.tab === 3 && t !== 3) leftTab3At = Date.now();
       if (t === 3 && S.tab !== 3 && MK && autoLock() && leftTab3At && Date.now() - leftTab3At > 60000) lockVault();
+      if (t === 3 && S.tab !== 3) S.show = {};
       S.tab = t; setPref('tab', t);
       if (t === 3 && !MK && secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false)) { render(true); return bioUnlock(); }
       break;
@@ -549,7 +555,7 @@ app.addEventListener('click', async e => {
       catch { S.pinErr = 'Mã khôi phục không đúng'; }
       break;
     }
-    case 'lock': lockVault(); toast('Đã khóa Tab Đỏ'); break;
+    case 'lock': case 'lock-now': S.dlg = null; lockVault(); toast('Đã khóa Tab Đỏ'); break;
     case 'sample': {
       // không thêm trùng nếu đã có mục cùng tên
       const hasS = new Set(stickers().map(x => x.title)), hasN = new Set(DB.all('notes').map(x => x.name));
@@ -572,27 +578,20 @@ app.addEventListener('click', async e => {
       });
       return;
     }
-    case 'tog': S.closed[d.id] = !S.closed[d.id]; setPref('closed', S.closed); break;
-    case 'eye': S.show[d.k] = !S.show[d.k]; break;
-    case 'copy-f': { const ac = vaultCache.find(x => x.id === d.id); copy(ac.fields[+d.f].v); return; }
-    case 'acc-new': S.newAcc = { id: DB.uid(), kind: 'acc', groupId: S.t3g, title: '', order: accsOf(S.t3g).length, fields: [{ k: 'Email', v: '', secret: false }, { k: 'Mật khẩu', v: '', secret: true }] };
+    case 'eye': S.show[d.id] = !S.show[d.id]; break;
+    case 'tok': { el.classList.remove('copied'); void el.offsetWidth; el.classList.add('copied'); copy(el.textContent); return; }
+    case 'acc-new': S.newAcc = { id: DB.uid(), kind: 'acc', groupId: S.t3g, title: '', order: accsOf(S.t3g).length, body: '' };
       vaultCache.push(S.newAcc); S.editAcc = S.newAcc.id; S.t3new = true; S.q = ''; render(true); app.querySelector('[data-ae="title"]')?.focus(); return;
     case 'acc-menu': {
       const ac = vaultCache.find(x => x.id === d.id);
       popover(el, `<button class="mi" data-ed="1">${I.pen}Sửa</button><button class="mi danger" data-del="1">${I.trash}Xóa tài khoản</button>`, o => {
-        if (o.ed) { S.editAcc = d.id; S.t3new = false; S.closed[d.id] = false; render(true); app.querySelector('#accedit')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        if (o.ed) { S.editAcc = d.id; S.t3new = false; render(true); app.querySelector('#accedit')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
         if (o.del) confirmDlg('Xóa tài khoản?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); render(true); toast('Đã xóa'); });
       });
       return;
     }
-    case 'acc-edit': S.editAcc = d.id; S.t3new = false; S.closed[d.id] = false; break;
-    case 'ae-addf': case 'ae-delf': {
-      const n = collectAccEditor();
-      if (a === 'ae-addf') n.fields.push({ k: '', v: '', secret: false }); else n.fields.splice(+d.fi, 1);
-      const i = vaultCache.findIndex(v => v.id === n.id); vaultCache[i] = n; if (S.newAcc && S.newAcc.id === n.id) S.newAcc = n; break;
-    }
     case 'ae-cancel': if (S.t3new) vaultCache = vaultCache.filter(v => v.id !== S.editAcc); S.editAcc = null; S.t3new = false; await refreshVault(); break;
-    case 'ae-save': { const n = collectAccEditor(); n.fields = n.fields.filter(f => f.k || f.v); if (!n.title) n.title = 'Không tên'; await saveVault(n); S.editAcc = null; S.t3new = false; S.newAcc = null; toast('Đã lưu, đã mã hóa'); break; }
+    case 'ae-save': { const n = collectAccEditor(); if (!n.title) n.title = 'Không tên'; await saveVault(n); S.editAcc = null; S.t3new = false; S.newAcc = null; S.show[n.id] = false; toast('Đã lưu, nội dung đã ẩn'); break; }
     case 'acc-del': { const ac = vaultCache.find(x => x.id === d.id); confirmDlg('Xóa tài khoản?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); S.editAcc = null; render(true); }); return; }
     // tài khoản đồng bộ
     case 'signin': case 'signup': case 'resetpass': {
@@ -709,6 +708,7 @@ const HOLD_MS = 320;
 let hold = null, drag = null, eatClick = false;
 const SORTS = [
   { item: '.stk', box: '.wall', key: el => el.dataset.s || 'gio', ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
+  { item: '.acc[data-id]', box: '.acc-wrap', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK && !S.editAcc && !S.q, save: ids => saveAccOrder(ids) },
   { item: '.li[data-act="note-pick"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 2 && S.t2sort === 'manual', save: ids => saveNoteOrder(ids) }
 ];
 app.addEventListener('pointerdown', e => {
@@ -772,7 +772,11 @@ function endDrag() {
   app.classList.remove('dragging-stk');
   const ids = [...box.querySelectorAll(cfg.item)].map(cfg.key);
   // mục đang kéo bay về chỗ mới
-  flip(cfg.item, cfg.key, () => { el.classList.remove('lift'); cfg.save(ids); render(true); }, 300);
+  const k = cfg.key(el);
+  flip(cfg.item, cfg.key, () => { el.classList.remove('lift'); cfg.save(ids); render(true); }, 240);
+  // hạ xuống kèm pop nhẹ
+  const n = [...app.querySelectorAll(cfg.item)].find(x => cfg.key(x) === k);
+  n?.animate([{ scale: 1.04 }, { scale: 1 }], { duration: 320, easing: 'cubic-bezier(.34,1.56,.64,1)' });
 }
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);
@@ -785,6 +789,10 @@ function saveStickerOrder(ids) {
     const x = DB.get('stickers', id); if (x && x.order !== order) DB.put('stickers', { ...x, order });
   });
   quiet = false;
+}
+function saveAccOrder(ids) {
+  // đổi thứ tự trong bộ nhớ ngay (để vẽ lại đúng), mã hóa + lưu chạy sau
+  ids.forEach((id, i) => { const v = vaultCache.find(x => x.id === id); if (v && v.order !== i) { v.order = i; saveVault(v); } });
 }
 function saveNoteOrder(ids) {
   quiet = true;
