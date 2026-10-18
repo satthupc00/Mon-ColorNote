@@ -2,6 +2,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
+import { Keyboard } from '@capacitor/keyboard';
 
 export const REPO = 'satthupc00/Mon-ColorNote';
 export const isDesktop = !!window.desktop;
@@ -92,3 +93,13 @@ export async function installUpdate() {
   }
 }
 export function restartToUpdate() { if (isDesktop) window.desktop.installUpdate(); }
+
+// ---------- Android: nút Back + bàn phím ----------
+export function onBack(cb) { if (isAndroid) CapApp.addListener('backButton', cb); }
+export function exitApp() { if (isAndroid) CapApp.exitApp(); }
+// cb(chiều cao bàn phím theo px CSS, 0 khi ẩn)
+export function onKeyboard(cb) {
+  if (!isAndroid) return;
+  Keyboard.addListener('keyboardDidShow', i => cb(i.keyboardHeight || 0));
+  Keyboard.addListener('keyboardWillHide', () => cb(0));
+}

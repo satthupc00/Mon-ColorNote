@@ -54,7 +54,7 @@ function ensureGroups() {
   if (!lost.length) return;
   quiet = true;
   for (const n of lost) {
-    const gid = n.groupId ? G_UNSORTED : G_DEFAULT;
+    const gid = !n.groupId || n.groupId === G_DEFAULT ? G_DEFAULT : G_UNSORTED;
     if (!ids.has(gid)) { DB.put('ngroups', { id: gid, name: gid === G_DEFAULT ? 'Phần mềm' : 'Chưa phân loại', order: gid === G_DEFAULT ? 0 : 999 }); ids.add(gid); }
     DB.put('notes', { ...n, groupId: gid });
   }
@@ -684,7 +684,14 @@ app.addEventListener('click', async e => {
       if (!gid) { toast('Tạo một nhóm trước nhé'); return; }
       S.t2new = gid; S.t2open = false; render(true); document.getElementById('newnote')?.focus(); return;
     }
-    case 'g2-tog': S.gclosed[d.g] = !S.gclosed[d.g]; setPref('gclosed', S.gclosed); flip('.ngrp,.li', x => x.dataset.g || x.dataset.id, () => render(true), 220); return;
+    case 'g2-tog': {
+      // chỉ trượt các nhóm (không trượt từng dòng con, tránh danh sách bị "bay" từ ngoài vào)
+      const opening = !!S.gclosed[d.g];
+      S.gclosed[d.g] = !S.gclosed[d.g]; setPref('gclosed', S.gclosed);
+      flip('.ngrp', x => x.dataset.g, () => render(true), 220);
+      if (opening) app.querySelector(`.ngrp[data-g="${d.g}"] .gl`)?.animate([{ opacity: 0, translate: '0 -6px' }, { opacity: 1, translate: '0 0' }], { duration: 220, easing: EASE });
+      return;
+    }
     case 'g2-new': {
       const order = Math.min(0, ...ngroups().map(g => g.order ?? 0)) - 1;
       const g = DB.put('ngroups', { id: DB.uid(), name: 'Nhóm mới', order });
@@ -827,7 +834,9 @@ app.addEventListener('submit', e => {
 });
 // gõ chữ: lưu ngay, không vẽ lại để không mất con trỏ
 const saveTimers = {};
-const debounce = (k, fn, ms = 500) => { clearTimeout(saveTimers[k]); saveTimers[k] = setTimeout(fn, ms); };
+const debounce = (k, fn, ms = 500) => { clearTimeout(saveTimers[k]?.t); saveTimers[k] = { fn, t: setTimeout(() => { delete saveTimers[k]; fn(); }, ms) }; };
+// lưu ngay mọi chỗ đang gõ dở (dùng khi bấm Back)
+function flushSaves() { for (const k of Object.keys(saveTimers)) { clearTimeout(saveTimers[k].t); const f = saveTimers[k].fn; delete saveTimers[k]; f(); } }
 app.addEventListener('input', e => {
   const t = e.target, kind = t.dataset.edit;
   if (t.id === 'q3') { S.q = t.value; const pos = t.selectionStart; render(true); const q = document.getElementById('q3'); q.focus(); q.setSelectionRange(pos, pos); return; }
@@ -1046,6 +1055,47 @@ DB.onChange(async c => {
   if (c === 'meta') { const m = secMeta(); if (MK && (!m || m.keyId !== MKID)) { lockVault(); await P.keyClear(); setPref('bioKey', false); } }
   if (c === 'vault' && MK && !S.editAcc) await refreshVault();
   render();
+});
+// ---------- Android: nút Back ----------
+// Back = lùi 1 màn: đóng bảng/menu → lưu & thoát chỗ đang sửa → về danh sách → (màn chính) bấm 2 lần để thoát
+let backAt = 0;
+P.onBack(async () => {
+  if (app.querySelector('.pop')) return closePop();
+  if (S.dlg) { S.dlg = null; return render(true); }
+  if (S.editAcc) { const n = collectAccEditor(); if (n) { if (!n.title) n.title = 'Không tên'; await saveVault(n); S.show[n.id] = false; toast('Đã lưu'); } S.editAcc = null; S.t3new = false; S.newAcc = null; return render(true); }
+  const a = document.activeElement;
+  if (a && app.contains(a) && (a.isContentEditable || /INPUT|TEXTAREA/.test(a.tagName))) { flushSaves(); a.blur(); if (S.tab !== 2 || !S.t2open) return render(true); }
+  flushSaves();
+  if (S.g2ren) { S.g2ren = null; return render(true); }
+  if (S.t2new) { S.t2new = false; return render(true); }
+  if (S.tab === 2 && S.compact && S.t2open) { S.t2open = false; return render(true); }
+  if (S.tab === 3 && !MK && ['forgot', 'pin', 'newpin'].includes(S.t3)) { S.t3 = 'lock'; S.pin = ''; S.pinErr = ''; return render(true); }
+  if (S.tab === 3 && MK && S.t3 === 'newpin') { S.t3 = 'open'; return render(true); }
+  if (Date.now() - backAt < 2000) return P.exitApp();
+  backAt = Date.now(); toast('Bấm lùi thêm lần nữa để thoát app');
+});
+// ---------- Android: bàn phím không che chữ ----------
+// thu nhỏ vùng app bằng đúng chiều cao bàn phím rồi cuộn chỗ đang gõ vào tầm nhìn
+let h0 = innerHeight;
+P.onKeyboard(kb => {
+  if (!kb) { app.style.paddingBottom = ''; h0 = innerHeight; return; }
+  const resized = h0 - innerHeight > kb * .5; // webview đã tự co lại thì thôi
+  app.style.paddingBottom = resized ? '' : kb + 'px';
+  requestAnimationFrame(() => {
+    const sel = getSelection(), r = sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+    const el = document.activeElement, box = el && el.closest('.editor,.scroll,.list,.acc-edit') || el;
+    if (!box) return;
+    const bottom = app.getBoundingClientRect().bottom - (resized ? 0 : kb) - 24;
+    const y = r && r.bottom ? r.bottom : el.getBoundingClientRect().bottom;
+    if (y > bottom) { const sc = el.closest('.editor,.scroll,.list') || el; sc.scrollTop += y - bottom + 40; }
+  });
+});
+// gõ xuống dòng mới trong ghi chú dài: giữ con trỏ luôn trong tầm nhìn
+app.addEventListener('input', e => {
+  if (!P.isAndroid || !e.target.classList?.contains('editor')) return;
+  const sel = getSelection(); if (!sel.rangeCount) return;
+  const r = sel.getRangeAt(0).getBoundingClientRect(), ed = e.target, er = ed.getBoundingClientRect();
+  if (r.bottom && r.bottom > er.bottom - 24) ed.scrollTop += r.bottom - er.bottom + 48;
 });
 DB.onAuth(u => { if (u) IMG.uploadPending(); render(true); });
 // bấm đúp vào hình trong ghi chú để xem lớn

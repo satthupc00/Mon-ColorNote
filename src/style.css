@@ -425,3 +425,5 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 
 .ld .lpane:has(.tree){width:276px}
 .tools2 .sortseg button{padding:5px 7px;white-space:nowrap}
+
+.app{transition:padding-bottom .18s var(--ease-out)}
