@@ -156,11 +156,11 @@ function syncDot() {
 }
 function updButton() {
   const u = S.upd;
-  const st = { checking: 'spin', progress: 'spin', available: 'avail', downloaded: 'avail', latest: 'ok', error: 'err' }[u.ev] || '';
+  const st = { checking: 'checking', progress: 'checking', available: 'avail', downloaded: 'avail', latest: 'ok', error: 'err' }[u.ev] || '';
   const tip = { checking: 'Đang kiểm tra cập nhật…', progress: `Đang tải bản mới ${u.percent || 0}%`, available: `Có bản mới ${u.version || ''} · bấm để cập nhật`,
     downloaded: P.isDesktop ? 'Đã tải xong · bấm để khởi động lại và cài' : 'Đang mở trình cài đặt', latest: 'Kiểm tra cập nhật · Đã là bản mới nhất', error: 'Kiểm tra cập nhật · ' + (u.message || 'lỗi') }[u.ev] || 'Kiểm tra cập nhật';
   const act = u.ev === 'available' ? 'upd-install' : u.ev === 'downloaded' && P.isDesktop ? 'upd-restart' : 'upd-check';
-  return `<button type="button" class="ibtn upd ${st}" data-act="${act}" title="${esc(tip)}" aria-label="${esc(tip)}" ${st === 'spin' ? 'disabled' : ''}>${I.refresh}</button>${!P.isDesktop && u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}`;
+  return `<button type="button" class="ibtn upd ${st}" data-act="${act}" title="${esc(tip)}" aria-label="${esc(tip)}" ${st === 'checking' ? 'disabled' : ''}>${I.refresh}</button>${!P.isDesktop && u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}`;
 }
 const phoneUI = () => !P.isDesktop && (P.isAndroid || !S.wide);
 function header() {
