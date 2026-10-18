@@ -390,3 +390,9 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .li.drop-target{background:var(--sel);box-shadow:inset 3px 0 0 var(--red),0 0 0 2px var(--red);scale:1.03;transition:scale var(--t-med) var(--ease-spring)}
 .pop .pop-t{font-size:11.5px;font-weight:800;color:var(--mu);padding:6px 10px 4px}
 .lpane .li{cursor:grab}
+
+.upd-dlg{text-align:center}
+.upd-dlg h2{justify-content:center}
+.upd-ic{width:56px;height:56px;margin:4px auto 10px;border-radius:18px;background:rgba(46,184,114,.15);color:var(--ok);display:grid;place-items:center}
+.upd-ic svg{width:28px;height:28px}
+.upd-dlg .acts{justify-content:center}

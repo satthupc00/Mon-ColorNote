@@ -467,6 +467,10 @@ function accEditor(a) {
 // ---------- hộp thoại ----------
 function dialog() {
   if (!S.dlg) return '';
+  if (S.dlg.type === 'upd-ready') return `<div class="ov"><div class="dlg upd-dlg" role="dialog" aria-label="Bản cập nhật đã sẵn sàng">
+    <div class="upd-ic">${I.refresh}</div><h2><span>Bản ${esc(S.updVersion || 'mới')} đã tải xong</span></h2>
+    <p>Bấm "Cài ngay" để Mon TriNote tự đóng, cài bản mới rồi mở lại. Ghi chú của bạn đã được lưu, không mất gì.</p>
+    <div class="acts"><button class="btn" data-act="dlg-close">Để sau</button><button class="btn pri" data-act="upd-restart">Cài ngay</button></div></div></div>`;
   if (S.dlg.type === 'img') return `<div class="ov lightbox" data-act="ov-img"><img src="${S.dlg.src}" alt=""></div>`;
   if (S.dlg.type === 'confirm') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2><p>${esc(S.dlg.text)}</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Hủy</button><button class="btn pri" data-act="dlg-ok">${esc(S.dlg.ok || 'Xóa')}</button></div></div></div>`;
@@ -902,7 +906,8 @@ function endDrag() {
   const ids = [...box.querySelectorAll(cfg.item)].map(cfg.key);
   // mục đang kéo bay về chỗ mới
   const k = cfg.key(el);
-  flip(cfg.item, cfg.key, () => { el.classList.remove('lift'); cfg.save(ids); render(true); }, 240);
+  // bỏ vị trí đang kéo + vẽ lại toàn bộ danh sách, rồi FLIP từ chỗ thả về đúng ô (không để mục nằm lơ lửng)
+  flip(cfg.item, cfg.key, () => { el.classList.remove('lift'); el.style.translate = ''; cfg.save(ids); parts['p-main'] = null; render(true); }, 240);
   // hạ xuống kèm pop nhẹ
   const n = [...app.querySelectorAll(cfg.item)].find(x => cfg.key(x) === k);
   n?.animate([{ scale: 1.04 }, { scale: 1 }], { duration: 320, easing: 'cubic-bezier(.34,1.56,.64,1)' });
@@ -968,7 +973,11 @@ app.addEventListener('dblclick', e => { const im = e.target.closest('.editor img
 
 // cập nhật
 P.onUpdate(u => {
-  S.upd = u;
+  if (u.version) S.updVersion = u.version;
+  S.upd = { ...u, version: u.version || S.updVersion };
+  // PC: tải xong → hiện bảng hỏi khởi động lại để cài
+  if (u.ev === 'downloaded' && P.isDesktop) { S.dlg = { type: 'upd-ready' }; return render(true); }
+  if (u.ev === 'progress' && u.percent === 0 && S.updManual) toast('Đang tải bản mới…');
   if (u.ev === 'error' && S.updManual && S.dlg?.type !== 'settings') toast('Không kiểm tra được bản cập nhật');
   render(S.dlg?.type === 'settings');
 });

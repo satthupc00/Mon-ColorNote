@@ -76,7 +76,7 @@ const send = (ev, data) => { if (win && !win.isDestroyed()) win.webContents.send
 autoUpdater.on('update-available', i => send('available', { version: i.version }));
 autoUpdater.on('update-not-available', () => send('latest'));
 autoUpdater.on('download-progress', p => send('progress', { percent: Math.round(p.percent) }));
-autoUpdater.on('update-downloaded', () => send('downloaded'));
+autoUpdater.on('update-downloaded', i => send('downloaded', { version: i && i.version }));
 autoUpdater.on('error', e => send('error', { message: String(e && e.message || e) }));
 ipcMain.handle('upd:check', async () => {
   if (!app.isPackaged) { send('latest'); return; }
