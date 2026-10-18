@@ -24,5 +24,7 @@ export const I = {
   x14: sv(13, '<path d="M6 6l12 12M18 6L6 18"/>'),
   sun: sv(13, '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   lotus: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4c-2 2.4-2.6 5.6 0 10 2.6-4.4 2-7.6 0-10z"/><path d="M12 14c-1.6-3.6-4.6-5.6-8-5.4.2 3.6 3.4 6.4 8 5.4z"/><path d="M12 14c1.6-3.6 4.6-5.6 8-5.4-.2 3.6-3.4 6.4-8 5.4z"/><path d="M4 17c2.6 2 13.4 2 16 0"/></svg>`,
+  refresh: sv(17, '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>'),
+  arrowR: sv(18, '<path d="M5 12h14M13 6l6 6-6 6"/>'),
   moon: sv(13, '<path d="M21 13.5A8.5 8.5 0 0 1 10.5 3a8.5 8.5 0 1 0 10.5 10.5z"/>', true)
 };

@@ -123,7 +123,7 @@ export async function initSync() {
 const authMsg = e => ({
   'auth/invalid-credential': 'Sai email hoặc mật khẩu', 'auth/wrong-password': 'Sai mật khẩu', 'auth/user-not-found': 'Chưa có tài khoản với email này',
   'auth/email-already-in-use': 'Email này đã có tài khoản, hãy đăng nhập', 'auth/weak-password': 'Mật khẩu cần ít nhất 6 ký tự',
-  'auth/invalid-email': 'Email không hợp lệ', 'auth/network-request-failed': 'Không có mạng', 'auth/too-many-requests': 'Thử sai nhiều quá, đợi một lúc nhé', 'auth/operation-not-allowed': 'Chưa bật đăng nhập Email/Password trong Firebase'
+  'auth/invalid-email': 'Email không hợp lệ', 'auth/network-request-failed': 'Không có mạng', 'auth/too-many-requests': 'Thử sai nhiều quá, đợi một lúc nhé', 'auth/operation-not-allowed': 'Máy chủ đồng bộ chưa bật đăng nhập bằng email'
 }[e.code] || e.message);
 export async function signIn(email, pass) { const { A, auth } = await lib(); try { await A.signInWithEmailAndPassword(auth, email, pass); } catch (e) { throw new Error(authMsg(e)); } }
 export async function signUp(email, pass) { const { A, auth } = await lib(); try { await A.createUserWithEmailAndPassword(auth, email, pass); } catch (e) { throw new Error(authMsg(e)); } }

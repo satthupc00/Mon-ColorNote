@@ -117,8 +117,8 @@ function render(force) {
     ind.style.top = top; ind.style.background = getComputedStyle(b).backgroundColor;
   }
   if (lastTheme !== S.theme) { lastTheme = S.theme; if (P.isDesktop) window.desktop.setTheme?.(S.theme); P.setSystemBars(S.theme); }
-  const pw = document.getElementById('pw');
-  if (pw && !S.dlg && document.activeElement !== pw) pw.focus();
+  const pwIn = app.querySelector('.pw input');
+  if (pwIn && !S.dlg && !app.querySelector('.pw input:focus')) pwIn.focus();
   for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
 }
 // chỉ chạy hiệu ứng xuất hiện cho phần tử mới, không chạy lại mỗi lần vẽ
@@ -146,19 +146,31 @@ const footInfo = () => {
   return MK ? `${groups().length} nhóm · ${vaultCache.filter(v => v.kind === 'acc').length} tài khoản · đã mã hóa` : 'Đã khóa';
 };
 
+// Góc phải trên (m-skill §2b): [chấm đồng bộ] [cài đặt] [cập nhật]
+const SYNC_TXT = st => ({ local: 'Chỉ lưu trên máy này', offline: DB.currentUser() ? 'Ngoại tuyến, sẽ đồng bộ khi có mạng' : 'Đăng nhập để đồng bộ', syncing: 'Đang đồng bộ…', synced: 'Đã đồng bộ', error: 'Lỗi đồng bộ' }[st]);
+function syncDot() {
+  const st = DB.syncState.status, user = DB.currentUser();
+  const cls = { synced: 'synced', syncing: 'pending', error: 'error' }[st] || '';
+  const txt = SYNC_TXT(st) + (user ? ' · ' + user.email : '');
+  return `<button type="button" class="syncdot ${cls}" data-act="sync-info" title="${esc(txt)}" aria-label="Đồng bộ: ${esc(txt)}"><i></i></button>`;
+}
+function updButton() {
+  const u = S.upd;
+  const st = { checking: 'spin', progress: 'spin', available: 'avail', downloaded: 'avail', latest: 'ok', error: 'err' }[u.ev] || '';
+  const tip = { checking: 'Đang kiểm tra cập nhật…', progress: `Đang tải bản mới ${u.percent || 0}%`, available: `Có bản mới ${u.version || ''} · bấm để cập nhật`,
+    downloaded: P.isDesktop ? 'Đã tải xong · bấm để khởi động lại và cài' : 'Đang mở trình cài đặt', latest: 'Kiểm tra cập nhật · Đã là bản mới nhất', error: 'Kiểm tra cập nhật · ' + (u.message || 'lỗi') }[u.ev] || 'Kiểm tra cập nhật';
+  const act = u.ev === 'available' ? 'upd-install' : u.ev === 'downloaded' && P.isDesktop ? 'upd-restart' : 'upd-check';
+  return `<button type="button" class="ibtn upd ${st}" data-act="${act}" title="${esc(tip)}" aria-label="${esc(tip)}" ${st === 'spin' ? 'disabled' : ''}>${I.refresh}</button>${!P.isDesktop && u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}`;
+}
+const phoneUI = () => !P.isDesktop && (P.isAndroid || !S.wide);
 function header() {
-  const u = S.upd, st = DB.syncState.status, user = DB.currentUser();
-  const syncTxt = { local: 'Chỉ trên máy này', offline: user ? 'Ngoại tuyến' : 'Chưa đăng nhập', syncing: 'Đang đồng bộ…', synced: 'Đã đồng bộ', error: 'Lỗi đồng bộ' }[st];
-  const updBtn = u.ev === 'available' ? `<button class="updbtn" data-act="upd-install" title="Tải và cài bản mới">Có bản ${esc(u.version)} · Cập nhật</button>`
-    : u.ev === 'progress' ? `<button class="updbtn" disabled>Đang tải ${u.percent || 0}%</button>`
-    : u.ev === 'downloaded' && P.isDesktop ? `<button class="updbtn" data-act="upd-restart">Khởi động lại để cập nhật</button>` : '';
+  const right = `${syncDot()}<button type="button" class="ibtn" data-act="settings" title="Cài đặt (Ctrl+,)" aria-label="Cài đặt">${I.gear}</button>${updButton()}`;
+  // Điện thoại (m-skill §5): không có logo + tên, chỉ 1 hàng icon mỏng ở góc phải
+  if (phoneUI()) return `<header class="hdr thin">${right}</header>`;
   return `<header class="hdr">
     <div class="brand"><img src="${iconUrl}" alt="">
-      <div style="min-width:0"><div class="brand-name"><span><span class="m">Mon</span> <span class="a">TriNote</span></span>${u.ev === 'latest' ? '<span class="latest">latest</span>' : ''}</div>
-</div></div>
-    ${updBtn}
-    ${S.compact ? `<span class="sync ${st}" title="${syncTxt}"><i></i></span>` : `<span class="sync ${st}"><i></i>${syncTxt}</span>`}
-    <button class="ibtn" data-act="settings" title="Cài đặt (Ctrl+,)" aria-label="Cài đặt">${I.gear}</button>
+      <div class="brand-name"><span><span class="m">Mon</span> <span class="a">TriNote</span></span>${S.upd.ev === 'latest' ? '<span class="latest">latest</span>' : ''}</div></div>
+    <div class="tools">${right}</div>
   </header>`;
 }
 const TAB_TIPS = ['', 'Sticker việc cần làm (Ctrl+1)', 'Ghi chú phần mềm (Ctrl+2)', 'Tài khoản bảo mật (Ctrl+3)'];
@@ -245,15 +257,30 @@ const pad = () => `<div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'x', 0, '⌫']
 // PC: ô gõ mật khẩu (cho phép cả chữ). Điện thoại: bàn phím số, có nút chuyển sang gõ chữ.
 const textMode = () => P.isDesktop || S.pinText;
 const PW = () => textMode() ? 'mật khẩu' : 'mã PIN';
+// Ô mật khẩu dài (m-skill §2.2): nút mắt + mũi tên đỏ, Enter để gửi
+const pwField = (id, ph, go) => `<div class="pw ${S.pinErr && go ? 'shake' : ''}"><input type="password" id="${id}" placeholder="${ph}" aria-label="${ph}" autocomplete="off" enterkeyhint="${go ? 'go' : 'next'}" spellcheck="false">
+  <button type="button" class="ibtn eye" data-eye title="Hiện/ẩn mật khẩu" aria-label="Hiện/ẩn mật khẩu">${I.eye}</button>
+  ${go ? `<button type="submit" class="ibtn go" title="${go} (Enter)" aria-label="${go}">${I.arrowR}</button>` : ''}</div>`;
+const lockHead = (title, sub) => `<img class="lock-logo" src="${iconUrl}" alt=""><div class="brand-name lock-name"><span class="m">Mon</span> <span class="a">TriNote</span></div>
+  <h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}<div class="err">${esc(S.pinErr)}</div>`;
+function pwScreen(kind) {
+  const meta = secMeta();
+  if (kind === 'unlock') return lockHead('Tab Đỏ đang khóa', '') + `<form class="pwf" data-form="unlock" autocomplete="off">${pwField('pw', 'Mật khẩu', 'Mở khóa')}</form>`;
+  if (kind === 'create') return lockHead('Tạo mật khẩu', 'Dùng chữ, số, khoảng trắng hay tiếng Việt có dấu đều được. Có phân biệt chữ hoa, chữ thường.') +
+    (!DB.currentUser() && DB.hasFirebase ? `<p class="warn">Nên đăng nhập (Cài đặt) trước để mọi máy dùng chung một két.</p>` : '') +
+    `<form class="pwf" data-form="create" autocomplete="off">${pwField('pw', 'Mật khẩu mới', '')}${pwField('pw2', 'Nhập lại mật khẩu', 'Tạo mật khẩu')}</form>`;
+  // đổi mật khẩu: cần mật khẩu cũ, trừ khi vừa mở bằng mã khôi phục
+  return lockHead('Đổi mật khẩu', '') + `<form class="pwf" data-form="change" autocomplete="off">${S.recovered || !meta ? '' : pwField('pwold', 'Mật khẩu cũ', '')}${pwField('pw', 'Mật khẩu mới', '')}${pwField('pw2', 'Nhập lại mật khẩu mới', 'Lưu')}</form>
+    <button class="linkbtn" data-act="t3-cancel-change">Hủy</button>`;
+}
 function pinUI(btn) {
-  if (textMode()) return `<form class="pwform" data-form="pw" autocomplete="off"><input class="field pwin" id="pw" type="password" placeholder="Gõ ${PW()}…" autocomplete="off" enterkeyhint="done" aria-label="${PW()}"><button class="btn pri" type="submit">${btn}</button></form>
-    <div class="err">${esc(S.pinErr)}</div>${P.isDesktop ? '' : `<button class="linkbtn" data-act="pin-text">Dùng bàn phím số</button>`}`;
   return `${dots(S.pin.length)}<div class="err">${esc(S.pinErr)}</div>${pad()}<button class="linkbtn" data-act="pin-text">Mật khẩu có chữ? Gõ bằng bàn phím</button>`;
 }
 function tab3() {
   const meta = secMeta();
   if (!meta && S.t3 !== 'recovery') {
     const confirm = !!S.pin1;
+    if (textMode()) return `<div class="lock">${pwScreen('create')}${P.isDesktop ? '' : `<button class="linkbtn" data-act="pin-text">Dùng bàn phím số</button>`}</div>`;
     return `<div class="lock"><h2>${confirm ? 'Nhập lại ' + PW() : 'Tạo ' + PW()}</h2>
       <p>${confirm ? 'Nhập lại lần nữa để chắc chắn.' : textMode() ? 'Đặt mật khẩu (ít nhất 4 ký tự, được dùng cả chữ và số) để bảo vệ Tab Đỏ.' : 'Đặt 6 số để bảo vệ Tab Đỏ. Từ lần sau chỉ cần vân tay, PIN dùng khi vân tay không được.'}</p>
       ${!DB.currentUser() && DB.hasFirebase ? `<p style="color:var(--red)">Nên đăng nhập (Cài đặt) trước khi tạo ${PW()} để két dùng chung trên mọi máy.</p>` : ''}
@@ -268,12 +295,15 @@ function tab3() {
     <input class="field" id="reccode" style="max-width:320px;width:100%;text-align:center;font-size:16px;letter-spacing:.06em" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
     <div class="err">${esc(S.pinErr)}</div>
     <div style="display:flex;gap:8px"><button class="btn" data-act="t3-cancel">Quay lại</button><button class="btn pri" data-act="rec-unlock">Mở khóa</button></div></div>`;
+  if (S.t3 === 'newpin' && textMode()) return `<div class="lock">${pwScreen('change')}</div>`;
   if (S.t3 === 'newpin') return `<div class="lock"><h2>${S.pin1 ? 'Nhập lại ' + PW() + ' mới' : 'Đặt ' + PW() + ' mới'}</h2><p>${textMode() ? 'Ít nhất 4 ký tự, được dùng cả chữ và số.' : '6 số mới để mở Tab Đỏ.'}</p>${pinUI(S.pin1 ? 'Xác nhận' : 'Tiếp')}</div>`;
   if (!MK) {
     const canBio = S.bio && S.bioOn && pref('bioKey', false);
     if (S.t3 !== 'pin' && canBio) return `<div class="lock"><button class="fp" data-act="fp" aria-label="Mở bằng vân tay">${I.fp}</button>
       <h2>Chạm để mở bằng vân tay</h2><p>${P.isDesktop ? 'Dùng Windows Hello (vân tay hoặc khuôn mặt).' : 'Đặt ngón tay lên cảm biến vân tay.'}</p>
       <div class="err">${esc(S.pinErr)}</div><button class="linkbtn" data-act="usepin">Dùng ${PW()}</button></div>`;
+    if (textMode()) return `<div class="lock">${pwScreen('unlock')}${P.isDesktop ? '' : `<button class="linkbtn" data-act="pin-text">Dùng bàn phím số</button>`}
+      <div style="display:flex;gap:14px">${canBio ? `<button class="linkbtn" data-act="t3-cancel">${P.isDesktop ? 'Dùng Windows Hello' : 'Dùng vân tay'}</button>` : ''}<button class="linkbtn" data-act="forgot">Quên ${PW()}?</button></div></div>`;
     return `<div class="lock"><h2>Nhập ${PW()}</h2><p>Tab Đỏ đang khóa.</p>${pinUI('Mở khóa')}
       <div style="display:flex;gap:14px">${canBio ? `<button class="linkbtn" data-act="t3-cancel">${P.isDesktop ? 'Dùng Windows Hello' : 'Dùng vân tay'}</button>` : ''}<button class="linkbtn" data-act="forgot">Quên ${PW()}?</button></div></div>`;
   }
@@ -328,8 +358,8 @@ function dialog() {
 function settings() {
   const u = S.upd, user = DB.currentUser(), L = S.login;
   const updTxt = { checking: 'Đang kiểm tra…', latest: 'Bạn đang dùng bản mới nhất', available: `Có bản mới ${u.version || ''}`, progress: `Đang tải ${u.percent || 0}%`, downloaded: P.isDesktop ? 'Đã tải xong, khởi động lại để cài' : 'Đang mở trình cài đặt', error: 'Lỗi: ' + (u.message || '') }[u.ev] || 'Kiểm tra trên GitHub Releases';
-  const acct = !DB.hasFirebase ? `<div class="row"><div class="t"><b>Chưa kết nối Firebase</b><small>Đang lưu trên máy này. Kết nối Firebase để đồng bộ PC và điện thoại.</small></div></div>`
-    : user ? `<div class="row"><div class="t"><b>${esc(user.email)}</b><small>Đồng bộ qua Firebase</small></div><button class="btn ghost" data-act="signout">Đăng xuất</button></div>`
+  const acct = !DB.hasFirebase ? `<div class="row"><div class="t"><b>Chưa bật đồng bộ</b><small>Đang lưu trên máy này.</small></div></div>`
+    : user ? `<div class="row"><div class="t"><b>${esc(user.email)}</b><small>${esc(SYNC_TXT(DB.syncState.status))}</small></div><button class="btn ghost" data-act="signout">Đăng xuất</button></div>`
     : `<div class="login"><input class="field" id="lg-email" type="email" placeholder="Email" value="${esc(L.email)}" autocomplete="username">
        <input class="field" id="lg-pass" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" autocomplete="current-password">
        <div class="acts"><button class="btn pri" data-act="signin" ${L.busy ? 'disabled' : ''}>Đăng nhập</button><button class="btn" data-act="signup" ${L.busy ? 'disabled' : ''}>Tạo tài khoản</button><button class="linkbtn" data-act="resetpass">Quên mật khẩu</button></div>
@@ -418,6 +448,9 @@ async function usePin(pin) {
   try {
     const r = await C.unlockWithPin(meta, pin);
     await setUnlocked(r.mk, r.mkB64, meta.keyId, true);
+    S.pinErr = '';
+    const lk = app.querySelector('.lock');
+    if (lk && !matchMedia('(prefers-reduced-motion: reduce)').matches) await lk.animate([{ opacity: 1 }, { opacity: 0, translate: '0 -14px' }], { duration: 450, easing: EASE }).finished.catch(() => {});
     S.pin = ''; S.t3 = 'open';
   } catch { S.pin = ''; S.pinErr = 'Sai ' + PW(); }
   render(true);
@@ -465,6 +498,7 @@ app.addEventListener('click', async e => {
       break;
     }
     case 'settings': S.dlg = { type: 'settings' }; break;
+    case 'sync-info': { const u = DB.currentUser(); toast(SYNC_TXT(DB.syncState.status) + (u ? ' · ' + u.email : '')); return; }
     case 'ov': case 'dlg-close': S.dlg = null; break;
     case 'dlg-ok': { const dl = S.dlg; S.dlg = null; const v = document.getElementById('dlgin'); dl.fn(v ? v.value.trim() : true); break; }
     case 'theme': S.theme = d.v; setPref('theme', d.v); break;
@@ -511,7 +545,7 @@ app.addEventListener('click', async e => {
     case 'rec-done': S.recovery = ''; S.t3 = 'open'; break;
     case 'rec-unlock': {
       const meta = secMeta(), code = document.getElementById('reccode').value;
-      try { const r = await C.unlockWithRecovery(meta, code); await setUnlocked(r.mk, r.mkB64, meta.keyId, true); S.t3 = 'newpin'; S.pin = ''; S.pin1 = ''; S.pinErr = ''; }
+      try { const r = await C.unlockWithRecovery(meta, code); await setUnlocked(r.mk, r.mkB64, meta.keyId, true); S.t3 = 'newpin'; S.recovered = true; S.pin = ''; S.pin1 = ''; S.pinErr = ''; }
       catch { S.pinErr = 'Mã khôi phục không đúng'; }
       break;
     }
@@ -524,7 +558,8 @@ app.addEventListener('click', async e => {
       if (MK && !groups().some(g => g.name.endsWith('(mẫu)'))) for (const v of sampleVault()) await saveVault(v);
       S.dlg = null; toast(MK ? 'Đã thêm dữ liệu mẫu vào cả 3 tab' : 'Đã thêm mẫu vào Tab Xanh lá và Xanh dương'); break;
     }
-    case 'chpin': S.dlg = null; S.tab = 3; S.t3 = 'newpin'; S.pin = ''; S.pin1 = ''; break;
+    case 'chpin': S.dlg = null; S.tab = 3; S.t3 = 'newpin'; S.recovered = false; S.pin = ''; S.pin1 = ''; S.pinErr = ''; break;
+    case 't3-cancel-change': S.t3 = MK ? 'open' : 'lock'; S.pinErr = ''; break;
     case 'autolock-tog': setPref('pcAutoLock', !pref('pcAutoLock', false)); break;
     case 'bio-tog': S.bioOn = !S.bioOn; setPref('bio', S.bioOn); if (!S.bioOn) { await P.keyClear(); setPref('bioKey', false); } else if (MKB64 && await P.keySave(MKB64)) setPref('bioKey', true); break;
     case 'g': S.t3g = d.id; S.q = ''; S.editAcc = null; break;
@@ -588,9 +623,35 @@ function addNote() {
   render(true);
 }
 
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-eye]'); if (!b) return;
+  const i = b.parentNode.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; i.focus();
+});
+// mật khẩu chữ (PC): tạo mới / đổi
+async function submitNewPw(kind, old, a, b) {
+  const meta = secMeta();
+  if (!a) { S.pinErr = 'Hãy nhập mật khẩu mới'; return render(true); }
+  if (a !== b) { S.pinErr = 'Hai lần nhập không khớp'; return render(true); }
+  if (kind === 'change' && meta && !S.recovered) {
+    try { await C.unlockWithPin(meta, old); } catch { S.pinErr = 'Mật khẩu cũ không đúng'; return render(true); }
+  }
+  S.pinErr = '';
+  if (!meta) {
+    const v = await C.createVault(a);
+    DB.put('meta', { id: 'sec', ...v.meta });
+    await setUnlocked(v.mk, v.mkB64, v.meta.keyId, true);
+    S.recovery = v.recovery; S.t3 = 'recovery';
+  } else {
+    DB.put('meta', { id: 'sec', ...(await C.rewrapPin(meta, MKB64, a)) });
+    S.recovered = false; S.t3 = 'open'; toast('Đã đổi mật khẩu');
+  }
+  render(true);
+}
 app.addEventListener('submit', e => {
   e.preventDefault();
-  if (e.target.dataset.form === 'pw') { const v = document.getElementById('pw').value; if (v) usePin(v); }
+  const f = e.target.dataset.form, v = id => (document.getElementById(id) || {}).value || '';
+  if (f === 'unlock') { if (v('pw')) usePin(v('pw')); }
+  if (f === 'create' || f === 'change') submitNewPw(f, v('pwold'), v('pw'), v('pw2'));
 });
 // gõ chữ: lưu ngay, không vẽ lại để không mất con trỏ
 const saveTimers = {};
@@ -672,7 +733,9 @@ function startDrag() {
 function follow() {
   const el = drag.el; el.style.translate = '0 0';
   const r = el.getBoundingClientRect();
-  el.style.translate = `${drag.px - drag.offX - r.left}px ${drag.py - drag.offY - r.top}px`;
+  // điện thoại / danh sách 1 cột: chỉ kéo lên xuống
+  const dx = S.compact || drag.cfg.box === '.list' ? 0 : drag.px - drag.offX - r.left;
+  el.style.translate = `${dx}px ${drag.py - drag.offY - r.top}px`;
 }
 window.addEventListener('pointermove', e => {
   if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) cancelHold();
@@ -681,7 +744,10 @@ window.addEventListener('pointermove', e => {
   drag.px = e.clientX; drag.py = e.clientY;
   const sc = drag.scroller, sr = sc && sc.getBoundingClientRect();
   if (sr) { if (e.clientY < sr.top + 50) sc.scrollTop -= 12; else if (e.clientY > sr.bottom - 50) sc.scrollTop += 12; }
-  const over = document.elementFromPoint(e.clientX, e.clientY)?.closest(drag.cfg.item);
+  // màn 1 cột: dò theo trục dọc ở giữa cột để kéo lệch ngang vẫn nhận đúng chỗ
+  const vertical = S.compact || drag.cfg.box === '.list';
+  const bx = vertical ? drag.box.getBoundingClientRect().left + drag.box.clientWidth / 2 : e.clientX;
+  const over = document.elementFromPoint(bx, e.clientY)?.closest(drag.cfg.item);
   if (over && over !== drag.el && over !== drag.last && drag.box.contains(over)) {
     drag.last = over;
     const sibs = [...drag.box.querySelectorAll(drag.cfg.item)];
