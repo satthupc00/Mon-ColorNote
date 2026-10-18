@@ -1,0 +1,218 @@
+<title>Mon TriNote Tab Đỏ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Trang trưng bày: thanh chọn thiết bị/theme → khung app Tab Đỏ (bấm thử được) → ghi chú + câu hỏi */
+:root{
+  --pg-bg:#EEF0F4; --pg-card:#FFFFFF; --pg-line:#DADDE4; --pg-fg:#262932; --pg-mu:#6E7482; --pg-seg:#E3E6EC;
+  --red:#E5383B; --ok:#1FA463;
+  --f-ui:"Nunito","Segoe UI",system-ui,sans-serif; --f-disp:"Baloo 2","Nunito",sans-serif; --f-brand:"Segoe UI","Nunito",sans-serif;
+  --ease:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--pg-bg:#16171B;--pg-card:#1F2126;--pg-line:#32353D;--pg-fg:#E8E9EC;--pg-mu:#8D929C;--pg-seg:#2A2D34;--ok:#3DDC8A;color-scheme:dark}}
+:root[data-theme="dark"]{--pg-bg:#16171B;--pg-card:#1F2126;--pg-line:#32353D;--pg-fg:#E8E9EC;--pg-mu:#8D929C;--pg-seg:#2A2D34;--ok:#3DDC8A;color-scheme:dark}
+body{background:var(--pg-bg);color:var(--pg-fg);font:14px/1.5 var(--f-ui)}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.top h1{margin:0;font:700 24px/1.1 var(--f-disp);text-wrap:balance}.top h1 .m{color:var(--red)}
+.top p{margin:2px 0 0;color:var(--pg-mu);font-size:13px}
+.seg{display:inline-flex;background:var(--pg-seg);border-radius:12px;padding:3px;gap:2px}
+.seg button{border:0;background:none;color:var(--pg-mu);font:700 12.5px var(--f-ui);padding:7px 12px;border-radius:9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--pg-card);color:var(--pg-fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.ctrls{display:flex;gap:8px;flex-wrap:wrap}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.stage{display:flex;justify-content:center;min-width:0}
+.scaler{transform-origin:top left}
+
+/* ---------- app ---------- */
+.app{--bg:#1B1D23;--surf:#24272F;--surf2:#2C3039;--line:#373B46;--tx:#ECEDF1;--mu:#8E94A1;--hov:#30343E;--r-soft:#3A2629;--sel:#3A2426;--green:#3DDC8A;--shadow:0 6px 16px rgba(0,0,0,.35);
+  background:var(--bg);color:var(--tx);font:13.5px/1.45 var(--f-ui);display:flex;flex-direction:column;overflow:hidden;position:relative;box-sizing:border-box;user-select:none}
+.app[data-at="light"]{--bg:#F3F5F9;--surf:#FFFFFF;--surf2:#EDF0F5;--line:#DFE3EA;--tx:#2A2D35;--mu:#7A8191;--hov:#F0F2F6;--r-soft:#FCE7E8;--sel:#FDE8E8;--green:#1FA463;--shadow:0 6px 14px rgba(60,70,90,.13)}
+.app *{box-sizing:border-box}
+.app button{font-family:inherit;cursor:pointer;transition:background-color .12s,border-color .12s,color .12s,transform .22s var(--ease)}
+.app button:active{transform:scale(.95)}
+.pc{width:1120px;height:700px;border-radius:12px;border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.ph{width:380px;height:820px;border-radius:34px;border:10px solid #0D0E11;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.hdr{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);min-height:58px;flex:0 0 auto}
+.brand{display:flex;align-items:center;gap:10px;flex:1}
+.brand i{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#9BF0B4,#2FB868 40%,#9DD3FF 40%,#2F86E8 70%,#FF9A9C 70%,#E5383B)}
+.bn{font:700 17px var(--f-brand)} .bn .m{color:var(--red)}
+.latest{font:800 10.5px var(--f-ui);color:var(--green);background:rgba(61,220,138,.14);padding:1px 7px;border-radius:20px;margin-left:6px}
+.winbtns{display:flex;gap:18px;margin-left:16px;color:var(--mu);font-size:14px;padding-right:4px}
+.dot{width:38px;height:38px;display:grid;place-items:center}.dot i{width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(61,220,138,.2)}
+.ib{width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:var(--surf);color:var(--tx);display:grid;place-items:center;flex:0 0 auto}
+.ib:hover{border-color:var(--red)}
+.ph .hdr{min-height:0;padding:30px 8px 2px;border:0;justify-content:flex-end}
+.ph .hdr .ib{border:0;background:none;width:38px;height:38px}
+.body{flex:1;display:flex;min-height:0}
+.rail{width:64px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 0}
+.tb{width:40px;height:40px;border-radius:14px;border:0;box-shadow:inset 0 -4px 0 rgba(0,0,0,.12)}
+.tb.g{background:#7FD49B}.tb.b{background:#86BDF0}.tb.r{background:#F29A9C;box-shadow:inset 0 -4px 0 rgba(0,0,0,.12),0 0 0 3px var(--bg),0 0 0 5px #F29A9C}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--r-soft),var(--bg) 220px);position:relative}
+.ld{flex:1;display:flex;min-height:0}
+.lp{width:236px;border-right:1px solid var(--line);padding:14px 8px}
+.lp b.h{display:block;font:700 15px var(--f-disp);padding:0 6px 8px}
+.li{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:12px;font-weight:700}
+.li.on{background:var(--sel);box-shadow:inset 3px 0 0 var(--red)}
+.li span{width:30px;height:30px;border-radius:10px;background:var(--r-soft);color:var(--red);display:grid;place-items:center;font:800 13px var(--f-disp)}
+.li small{display:block;color:var(--mu);font-weight:600;font-size:11px}
+.dp{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.search{display:flex;align-items:center;gap:8px;margin:12px 18px 6px;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:0 12px;color:var(--mu)}
+.search input{flex:1;border:0;background:none;color:var(--tx);font:600 13px var(--f-ui);padding:10px 0;outline:none;min-width:0}
+.chips{display:flex;gap:8px;padding:4px 16px 8px;overflow:auto;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--surf);color:var(--tx);font-weight:700;font-size:12px;padding:6px 12px;border-radius:20px;white-space:nowrap}
+.chip.on{background:var(--sel);border-color:var(--red)}
+.scroll{flex:1;overflow:auto;min-height:0;scrollbar-width:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:6px 18px 90px;align-content:start}
+.ph .grid{grid-template-columns:1fr;padding:6px 16px 90px}
+.ph .search{margin:4px 16px 6px}
+
+/* ---- thẻ mới: tiêu đề + nội dung tự do + nút mắt ---- */
+.card{background:var(--surf);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;align-self:start}
+.ch{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 14px}
+.ch .av{width:30px;height:30px;border-radius:10px;background:var(--r-soft);color:var(--red);display:grid;place-items:center;font:800 13px var(--f-disp);flex:0 0 auto}
+.ch b{flex:1;min-width:0;font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eye{width:34px;height:34px;border-radius:10px;border:0;background:none;color:var(--mu);display:grid;place-items:center}
+.eye:hover{color:var(--red);background:var(--surf2)}
+.eye[aria-pressed="true"]{color:var(--red);background:var(--sel)}
+.more{width:30px;height:34px;border:0;background:none;color:var(--mu);border-radius:10px;display:grid;place-items:center}
+.cb{border-top:1px solid var(--line);padding:8px 8px 10px;position:relative}
+.ln{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;border-radius:8px;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:copy}
+.ln:hover{background:var(--hov)}
+.ln .cp{margin-left:auto;opacity:0;color:var(--mu);flex:0 0 auto;transition:opacity .12s}
+.ln:hover .cp{opacity:1}
+.ln.blank{height:10px;padding:0}
+/* trạng thái ẩn: thanh mờ theo độ dài từng dòng */
+.mask{display:grid;gap:7px;padding:6px 6px 4px}
+.mask i{display:block;height:10px;border-radius:6px;background:repeating-linear-gradient(90deg,var(--surf2) 0 10px,var(--line) 10px 14px)}
+.mask small{color:var(--mu);font-size:11.5px;font-weight:700;margin-top:2px}
+.cb.reveal .ln{animation:rv .3s var(--ease) both}
+@keyframes rv{from{opacity:0;translate:0 4px}}
+/* sửa */
+.ed{padding:12px;display:grid;gap:8px}
+.ed input,.ed textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;color:var(--tx);font:600 13.5px/1.55 var(--f-ui);padding:9px 12px;outline:none}
+.ed input{font-weight:800}
+.ed textarea{min-height:130px;resize:vertical;user-select:text}
+.ed input:focus,.ed textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,56,59,.15)}
+.ed .acts{display:flex;gap:8px;justify-content:flex-end}
+.btn{border:1px solid var(--line);background:var(--surf);color:var(--tx);border-radius:12px;padding:7px 14px;font-weight:700;font-size:12.5px}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff;min-width:80px}
+.fab{position:absolute;right:18px;bottom:18px;width:52px;height:52px;border-radius:18px;border:0;background:var(--red);color:#fff;display:grid;place-items:center;box-shadow:0 8px 18px rgba(229,56,59,.4)}
+.foot{display:flex;justify-content:space-between;padding:7px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--mu)}
+.bnav{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 26px;padding:10px 0 4px;border-top:1px solid var(--line)}
+.bnav .tb{width:64px;height:30px;border-radius:15px}
+.bnav small{flex:0 0 100%;text-align:center;font-size:10px;color:var(--mu)}
+.toast{position:absolute;left:50%;bottom:80px;translate:-50% 0;background:var(--surf);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:12px;padding:9px 14px;font-weight:700;z-index:9;box-shadow:0 10px 26px rgba(0,0,0,.3);animation:rv .25s var(--spring)}
+.pop{position:absolute;z-index:8;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:5px;box-shadow:0 14px 30px rgba(0,0,0,.3);min-width:160px}
+.pop button{display:flex;width:100%;gap:8px;align-items:center;border:0;background:none;color:var(--tx);padding:8px 10px;border-radius:8px;font-weight:700;text-align:left}
+.pop button:hover{background:var(--hov)} .pop .d{color:var(--red)}
+
+/* ghi chú dưới */
+.cols{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:1fr}}
+.note{background:var(--pg-card);border:1px solid var(--pg-line);border-radius:16px;padding:16px 18px;min-width:0}
+.note h2{margin:0 0 8px;font:700 18px var(--f-disp)}
+.note ul,.note ol{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--pg-mu)}
+.note b{color:var(--pg-fg)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div><h1><span class="m">Mon</span> TriNote · Tab Đỏ mới</h1><p>Bản phác layout. Bấm con mắt, bấm vào dòng để copy, bấm "…" để sửa. Dữ liệu là ví dụ.</p></div>
+    <div class="ctrls">
+      <div class="seg" role="group" aria-label="Thiết bị"><button id="dv-pc" data-dv="pc" aria-pressed="true">PC</button><button id="dv-ph" data-dv="ph" aria-pressed="false">Điện thoại</button></div>
+      <div class="seg" role="group" aria-label="Giao diện"><button id="th-d" data-th="dark" aria-pressed="true">Dark</button><button id="th-l" data-th="light" aria-pressed="false">Light</button></div>
+    </div>
+  </div>
+  <div class="stage" id="stage"><div class="scaler" id="scaler"><div class="app" id="app"></div></div></div>
+  <div class="cols">
+    <div class="note"><h2>Thay đổi</h2><ul>
+      <li><b>Mỗi thẻ chỉ còn Tiêu đề + Nội dung.</b> Nội dung gõ tự do nhiều dòng như sticker, không còn ô Email / Mật khẩu riêng.</li>
+      <li><b>Nút con mắt</b> ở góc mỗi thẻ: ẩn thì nội dung thành các thanh mờ (giữ đúng số dòng, không đọc được), hiện thì chữ hiện lại.</li>
+      <li><b>Bấm vào 1 dòng là copy dòng đó</b>, thay cho các nút copy từng ô cũ. Tiện khi copy mật khẩu.</li>
+      <li><b>Sửa:</b> "…" → Sửa, mở ra 1 ô tiêu đề và 1 ô nội dung lớn. Khi sửa luôn hiện chữ.</li>
+      <li><b>Tìm kiếm</b> vẫn tìm theo tiêu đề. Dữ liệu vẫn mã hóa như cũ.</li>
+      <li><b>Dữ liệu cũ</b> tự chuyển sang dạng mới, ví dụ "Email: …" và "Mật khẩu: …" thành từng dòng trong nội dung.</li>
+    </ul></div>
+    <div class="note"><h2>Bạn chọn giúp mình</h2><ol>
+      <li><b>Mặc định khi mở Tab Đỏ:</b> mọi thẻ đều ẩn nội dung, bấm mắt mới hiện (mình đề xuất, an toàn hơn), hay nhớ trạng thái mắt của từng thẻ?</li>
+      <li><b>Bấm vào tiêu đề:</b> còn cần thu gọn cả thẻ như trước không, hay chỉ cần nút mắt là đủ?</li>
+    </ol></div>
+  </div>
+</div>
+
+<script>
+(function(){
+const I={
+ eye:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+ eyeOff:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+ dots:'<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+ copy:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="3"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+ search:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+ plus:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+ gear:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+ ref:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>'
+};
+const S={dv:'pc',th:'dark',show:{},edit:null,q:'',g:0};
+const groups=[{n:'Mạng xã hội',cards:[
+  {id:'a',t:'Facebook cá nhân',c:'Email: demo.mondiro@example.com\nMật khẩu: Fb-Demo#2026\n\n2FA bằng Google Authenticator\nMã dự phòng: 4821 9930 1177'},
+  {id:'b',t:'Instagram',c:'@demo.artist\nIg*Demo37'},
+  {id:'c',t:'Behance',c:'demo.mondiro@example.com\nBe-Demo!88\nPortfolio: behance.net/demo-artist'}]},
+ {n:'Công việc',cards:[{id:'d',t:'Spine license',c:'Mã: DEMO-0000-1111-2222\nEmail: demo.work@example.com\nHết hạn: 12/2027'}]},
+ {n:'Ngân hàng',cards:[{id:'e',t:'Ví điện tử',c:'SĐT 0900 000 000\nPIN 000000'}]}];
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const app=document.getElementById('app'),scaler=document.getElementById('scaler'),stage=document.getElementById('stage');
+
+function card(c){
+  if(S.edit===c.id) return `<div class="card"><form class="ed" data-ed="${c.id}"><input id="et" value="${esc(c.t)}" placeholder="Tiêu đề" aria-label="Tiêu đề"><textarea id="ec" placeholder="Nội dung: tài khoản, mật khẩu, ghi chú…" aria-label="Nội dung">${esc(c.c)}</textarea><div class="acts"><button type="button" class="btn" data-a="cancel">Hủy</button><button class="btn pri">Lưu</button></div></form></div>`;
+  const on=!!S.show[c.id], lines=c.c.split('\n');
+  const body=on?lines.map((l,i)=>l.trim()?`<div class="ln" data-a="copy" data-c="${c.id}" data-i="${i}" title="Bấm để copy dòng này">${esc(l)}<span class="cp">${I.copy}</span></div>`:'<div class="ln blank"></div>').join('')
+    :`<div class="mask">${lines.filter(l=>l.trim()).map(l=>`<i style="width:${Math.min(100,22+l.length*2.6)}%"></i>`).join('')}<small>Nội dung đang ẩn</small></div>`;
+  return `<div class="card"><div class="ch"><span class="av">${esc(c.t[0])}</span><b>${esc(c.t)}</b>
+    <button class="eye" data-a="eye" data-c="${c.id}" aria-pressed="${on}" title="${on?'Ẩn nội dung':'Hiện nội dung'}" aria-label="${on?'Ẩn nội dung':'Hiện nội dung'}">${on?I.eyeOff:I.eye}</button>
+    <button class="more" data-a="menu" data-c="${c.id}" aria-label="Sửa hoặc xóa">${I.dots}</button></div><div class="cb ${on?'reveal':''}">${body}</div></div>`;
+}
+function content(){
+  const g=groups[S.g], list=g.cards.filter(c=>!S.q||c.t.toLowerCase().includes(S.q.toLowerCase()));
+  const chips=S.dv==='ph'?`<div class="chips">${groups.map((x,i)=>`<button class="chip ${i===S.g?'on':''}" data-a="g" data-i="${i}">${x.n}</button>`).join('')}<button class="chip">+</button></div>`:'';
+  return `<div class="dp">${chips}<div class="search">${I.search}<input id="q" placeholder="Tìm tiêu đề trong ${g.n}…" value="${esc(S.q)}" autocomplete="off"></div><div class="scroll"><div class="grid">${list.map(card).join('')}</div></div></div>`;
+}
+function render(){
+  app.dataset.at=S.th; app.className='app '+S.dv;
+  const right=`<span class="dot" title="Đã đồng bộ"><i></i></span><button class="ib" aria-label="Cài đặt">${I.gear}</button><button class="ib" style="color:var(--green)" aria-label="Kiểm tra cập nhật">${I.ref}</button>${S.dv==='ph'?'<span class="latest">latest</span>':''}`;
+  if(S.dv==='pc'){
+    app.innerHTML=`<header class="hdr"><div class="brand"><i></i><span class="bn"><span class="m">Mon</span> TriNote</span><span class="latest">latest</span></div>${right}<span class="winbtns">─ &nbsp;☐ &nbsp;✕</span></header>
+    <div class="body"><nav class="rail"><button class="tb g"></button><button class="tb b"></button><button class="tb r"></button></nav><main class="main"><div class="ld">
+    <div class="lp"><b class="h">Nhóm</b>${groups.map((x,i)=>`<div class="li ${i===S.g?'on':''}" data-a="g" data-i="${i}"><span>${x.n[0]}</span><div>${x.n}<small>${x.cards.length} thẻ</small></div></div>`).join('')}</div>
+    ${content()}</div><button class="fab" aria-label="Thêm thẻ">${I.plus}</button></main></div><footer class="foot"><span>3 nhóm · 5 thẻ · đã mã hóa</span><span>Created by Mondiro</span></footer>`;
+  } else {
+    app.innerHTML=`<header class="hdr">${right}</header><main class="main">${content()}<button class="fab" aria-label="Thêm thẻ">${I.plus}</button></main>
+    <nav class="bnav"><button class="tb g"></button><button class="tb b"></button><button class="tb r"></button><small>Created by Mondiro</small></nav>`;
+  }
+  fit();
+}
+function fit(){const w=S.dv==='pc'?1120:380,h=S.dv==='pc'?700:820;const s=Math.min(1,(stage.clientWidth)/(w+(S.dv==='pc'?2:20)));scaler.style.transform=`scale(${s})`;scaler.style.width=w+'px';stage.style.height=(h*s+(S.dv==='pc'?2:20))+'px'}
+window.addEventListener('resize',fit);
+let tt;function toast(m){app.querySelectorAll('.toast,.pop').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.textContent=m;app.appendChild(t);clearTimeout(tt);tt=setTimeout(()=>t.remove(),1600)}
+const find=id=>groups.flatMap(g=>g.cards).find(c=>c.id===id);
+app.addEventListener('click',e=>{
+  const el=e.target.closest('[data-a]');if(!el)return;const a=el.dataset.a;
+  if(a==='eye'){S.show[el.dataset.c]=!S.show[el.dataset.c];render()}
+  if(a==='copy'){const l=find(el.dataset.c).c.split('\n')[+el.dataset.i];try{navigator.clipboard.writeText(l.replace(/^[^:]{1,20}:\s*/,'')).catch(()=>{})}catch(_){}toast('Đã copy: '+l.slice(0,28))}
+  if(a==='g'){S.g=+el.dataset.i;S.q='';render()}
+  if(a==='cancel'){S.edit=null;render()}
+  if(a==='menu'){app.querySelectorAll('.pop').forEach(x=>x.remove());const r=el.getBoundingClientRect(),ar=app.getBoundingClientRect(),sc=ar.width/app.offsetWidth;
+    const p=document.createElement('div');p.className='pop';p.innerHTML=`<button data-a="edit" data-c="${el.dataset.c}">Sửa</button><button class="d" data-a="del">Xóa thẻ</button>`;
+    p.style.left=((r.right-ar.left)/sc-160)+'px';p.style.top=((r.bottom-ar.top)/sc+4)+'px';app.appendChild(p);return}
+  if(a==='edit'){S.edit=el.dataset.c;render();app.querySelector('#ec')?.focus()}
+  if(a==='del'){toast('Bản phác: sẽ hỏi lại trước khi xóa')}
+  if(!e.target.closest('.pop'))app.querySelectorAll('.pop').forEach(x=>x.remove());
+});
+app.addEventListener('submit',e=>{e.preventDefault();const c=find(e.target.dataset.ed);c.t=document.getElementById('et').value||'Không tên';c.c=document.getElementById('ec').value;S.edit=null;S.show[c.id]=false;render();toast('Đã lưu, nội dung đã ẩn lại')});
+app.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const p=e.target.selectionStart;render();const q=document.getElementById('q');q.focus();q.setSelectionRange(p,p)}});
+document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=()=>{S.dv=b.dataset.dv;document.querySelectorAll('[data-dv]').forEach(x=>x.setAttribute('aria-pressed',x===b));render()});
+document.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.th=b.dataset.th;document.querySelectorAll('[data-th]').forEach(x=>x.setAttribute('aria-pressed',x===b));render()});
+S.show.a=true;render();
+})();
+</script>
