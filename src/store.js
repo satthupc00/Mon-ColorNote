@@ -128,4 +128,17 @@ const authMsg = e => ({
 export async function signIn(email, pass) { const { A, auth } = await lib(); try { await A.signInWithEmailAndPassword(auth, email, pass); } catch (e) { throw new Error(authMsg(e)); } }
 export async function signUp(email, pass) { const { A, auth } = await lib(); try { await A.createUserWithEmailAndPassword(auth, email, pass); } catch (e) { throw new Error(authMsg(e)); } }
 export async function resetPass(email) { const { A, auth } = await lib(); try { await A.sendPasswordResetEmail(auth, email); } catch (e) { throw new Error(authMsg(e)); } }
+// lưu / đọc 1 tài liệu lẻ trên đám mây (dùng cho hình ảnh, không đi qua localStorage)
+export async function remotePut(c, id, data) {
+  if (!user || !fb) return false;
+  const { F, db } = fb; await F.setDoc(F.doc(db, 'users', user.uid, c, id), data); return true;
+}
+export async function remoteGet(c, id) {
+  if (!user || !fb) return null;
+  const { F, db } = fb; const d = await F.getDoc(F.doc(db, 'users', user.uid, c, id)); return d.exists() ? d.data() : null;
+}
+export async function remoteDel(c, id) {
+  if (!user || !fb) return;
+  const { F, db } = fb; await F.deleteDoc(F.doc(db, 'users', user.uid, c, id)).catch(() => {});
+}
 export async function signOutUser() { const { A, auth } = await lib(); await A.signOut(auth); }

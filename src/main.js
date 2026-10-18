@@ -12,6 +12,7 @@ import * as P from './platform.js';
 import { I } from './icons.js';
 import { sampleStickers, sampleNotes, sampleVault } from './sample.js';
 import { deathAnniversary, canChi } from './lunar.js';
+import * as IMG from './images.js';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -66,15 +67,130 @@ async function saveVault(obj) {
 }
 function deleteVault(id) { DB.remove('vault', id); vaultCache = vaultCache.filter(v => v.id !== id); }
 
-// sanitize HTML ghi chú (chỉ giữ thẻ định dạng cơ bản)
-const OK_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'H4', 'KBD', 'SPAN']);
-function clean(html) {
+// ---------- ghi chú định dạng (Tab Xanh dương) ----------
+// Giữ: đậm, nghiêng, gạch dưới, gạch ngang, màu chữ, cỡ chữ, tiêu đề, danh sách, bảng, hình.
+// Màu lưu ở data-c (màu gốc), lúc hiển thị tự chỉnh sáng/tối cho hợp theme để luôn đọc được.
+const OK_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'H4', 'KBD', 'SPAN', 'IMG', 'TABLE', 'TBODY', 'THEAD', 'TR', 'TD', 'TH', 'HR', 'SUB', 'SUP']);
+const DROP_TAGS = new Set(['STYLE', 'SCRIPT', 'META', 'TITLE', 'HEAD', 'LINK', 'XML', 'NOSCRIPT', 'IFRAME', 'OBJECT', 'SVG', 'BUTTON', 'INPUT']);
+const ctx2d = document.createElement('canvas').getContext('2d');
+function normColor(c) {
+  if (!c) return null;
+  ctx2d.fillStyle = '#000'; ctx2d.fillStyle = c; const v = ctx2d.fillStyle;
+  if (!/^#[0-9a-f]{6}$/i.test(v)) return null;
+  const L = lum(v); return L < .06 || L > .94 ? null : v; // đen / trắng = màu mặc định, bỏ
+}
+function lum(hex) { const n = parseInt(hex.slice(1), 16); return (.299 * (n >> 16) + .587 * (n >> 8 & 255) + .114 * (n & 255)) / 255; }
+function mix(hex, to, t) { const a = parseInt(hex.slice(1), 16), b = parseInt(to.slice(1), 16); const ch = s => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; }
+const themed = hex => { const L = lum(hex); return S.theme === 'dark' ? (L < .5 ? mix(hex, '#ffffff', .5 - L * .4) : hex) : (L > .72 ? mix(hex, '#000000', .45) : hex); };
+function fontPx(v) {
+  const m = /^([\d.]+)(pt|px)$/.exec((v || '').trim()); if (!m) return null;
+  const px = +m[1] * (m[2] === 'pt' ? 4 / 3 : 1);
+  return px >= 13 && px <= 16.5 ? null : Math.round(Math.min(30, Math.max(11, px)));
+}
+function clean(html, paste) {
   const doc = new DOMParser().parseFromString(`<div>${html || ''}</div>`, 'text/html');
-  const walk = el => [...el.children].forEach(c => {
-    if (!OK_TAGS.has(c.tagName)) { c.replaceWith(...c.childNodes); return walk(el); }
-    [...c.attributes].forEach(a => c.removeAttribute(a.name)); walk(c);
+  const root = doc.body.firstChild;
+  const walk = el => {
+    for (const c of [...el.childNodes]) {
+      if (c.nodeType === 8) { c.remove(); continue; }
+      if (c.nodeType === 3) { if (paste) c.textContent = c.textContent.replace(/[\r\n]+/g, ' '); continue; }
+      if (c.nodeType !== 1) { c.remove(); continue; }
+      const tag = c.tagName;
+      if (DROP_TAGS.has(tag)) { c.remove(); continue; }
+      walk(c);
+      const st = c.style || {};
+      // đọc định dạng từ style / thẻ cũ
+      const col = c.getAttribute('data-c') || normColor(st.color || c.getAttribute('color'));
+      const fs = c.getAttribute('data-fs') || fontPx(st.fontSize);
+      const fw = st.fontWeight, bold = fw === 'bold' || +fw >= 600, notBold = fw === 'normal' || (+fw && +fw < 600);
+      const ital = st.fontStyle === 'italic', deco = (st.textDecoration || st.textDecorationLine || '');
+      const imgId = c.getAttribute('data-img'), imgSrc = c.getAttribute('src');
+      if (tag === 'IMG') {
+        [...c.attributes].forEach(a => c.removeAttribute(a.name));
+        if (imgId) c.setAttribute('data-img', imgId);
+        else if (paste && imgSrc) c.setAttribute('data-src', imgSrc);
+        else { c.remove(); continue; }
+        continue;
+      }
+      if (!OK_TAGS.has(tag) || ((tag === 'B' || tag === 'STRONG') && notBold)) {
+        // thẻ lạ (FONT, A, O:P…): giữ chữ, chuyển định dạng sang span
+        const sp = doc.createElement('span'); sp.append(...c.childNodes);
+        if (col) sp.setAttribute('data-c', col); if (fs) sp.setAttribute('data-fs', fs);
+        let node = sp;
+        if (bold && tag !== 'B') { const b = doc.createElement('b'); b.append(node); node = b; }
+        if (ital) { const i = doc.createElement('i'); i.append(node); node = i; }
+        if (deco.includes('underline')) { const u = doc.createElement('u'); u.append(node); node = u; }
+        if (deco.includes('line-through')) { const x = doc.createElement('s'); x.append(node); node = x; }
+        c.replaceWith(...(sp.attributes.length || node !== sp ? [node] : [...sp.childNodes]));
+        continue;
+      }
+      [...c.attributes].forEach(a => c.removeAttribute(a.name));
+      if (col) c.setAttribute('data-c', col);
+      if (fs) c.setAttribute('data-fs', fs);
+      // in đậm / nghiêng / gạch dưới viết bằng style → bọc thẻ thật
+      const wrapIn = t => { const w = doc.createElement(t); w.append(...c.childNodes); c.append(w); };
+      if (bold && !/^(B|STRONG|H\d|TH)$/.test(tag)) wrapIn('b');
+      if (ital && tag !== 'I' && tag !== 'EM') wrapIn('i');
+      if (deco.includes('underline') && tag !== 'U') wrapIn('u');
+      if (deco.includes('line-through') && !/^(S|STRIKE|DEL)$/.test(tag)) wrapIn('s');
+    }
+  };
+  walk(root);
+  return root.innerHTML;
+}
+// tô màu/cỡ chữ theo theme lúc hiển thị (không lưu vào dữ liệu)
+function paint(html) {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  doc.querySelectorAll('[data-c],[data-fs]').forEach(el => {
+    const c = el.getAttribute('data-c'), f = el.getAttribute('data-fs');
+    el.setAttribute('style', (c ? `color:${themed(c)};` : '') + (f ? `font-size:${f}px;` : ''));
   });
-  const root = doc.body.firstChild; walk(root); return root.innerHTML;
+  doc.querySelectorAll('img[data-img]').forEach(el => el.setAttribute('alt', ''));
+  return doc.body.firstChild.innerHTML;
+}
+// gắn ảnh thật vào các <img data-img> đang hiển thị
+function hydrateImgs() {
+  app.querySelectorAll('img[data-img]:not([src])').forEach(async el => {
+    const src = await IMG.load(el.dataset.img);
+    if (src) el.src = src; else el.classList.add('missing');
+  });
+}
+const saveNoteBody = (id, ed) => { const n = DB.get('notes', id); if (n) DB.put('notes', { ...n, body: clean(ed.innerHTML), editedAt: Date.now() }); };
+// dán từ Word / Google Docs / web: giữ định dạng, lấy cả hình
+async function pasteRich(e, ed) {
+  const cd = e.clipboardData, html = cd.getData('text/html');
+  const files = [...cd.files].filter(f => f.type.startsWith('image/'));
+  if (!html && !files.length) return; // để trình duyệt tự dán chữ thường
+  e.preventDefault();
+  const noteId = S.t2sel;
+  let body = html ? clean(html.replace(/^[\s\S]*<!--StartFragment-->|<!--EndFragment-->[\s\S]*$/g, ''), true) : '';
+  if (!body.includes('<img') && files.length) body += files.map(() => '<img data-src="file-slot">').join('');
+  // chèn đúng vị trí con trỏ, giữ nguyên thuộc tính (insertHTML của trình duyệt làm mất màu gốc)
+  const sel = getSelection(); let rg = sel.rangeCount ? sel.getRangeAt(0) : null;
+  if (!rg || !ed.contains(rg.commonAncestorContainer)) { rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); }
+  rg.deleteContents();
+  const frag = rg.createContextualFragment(paint(body)), last = frag.lastChild;
+  rg.insertNode(frag);
+  if (last) { rg.setStartAfter(last); rg.collapse(true); sel.removeAllRanges(); sel.addRange(rg); }
+  const pending = [...ed.querySelectorAll('img[data-src]')];
+  if (!pending.length) return saveNoteBody(noteId, ed);
+  toast(`Đang lưu ${pending.length} hình…`);
+  let fail = 0, fileIdx = 0;
+  for (const im of pending) {
+    const src = im.getAttribute('data-src');
+    try {
+      let data = null;
+      if (src.startsWith('data:image')) data = src;
+      else if (/^https?:/.test(src)) { const r = await fetch(src); if (r.ok) data = await r.blob(); }
+      else if (src.startsWith('file:') && window.desktop?.readClipImage) data = await window.desktop.readClipImage(src);
+      if (!data && files[fileIdx]) data = files[fileIdx++];
+      if (!data) throw 0;
+      const id = await IMG.save(await IMG.compress(data));
+      im.removeAttribute('data-src'); im.setAttribute('data-img', id); im.src = await IMG.load(id);
+    } catch { fail++; im.remove(); }
+  }
+  saveNoteBody(noteId, ed);
+  toast(fail ? `Có ${fail} hình không lấy được. Copy riêng từng hình rồi dán vào nhé` : `Đã dán kèm ${pending.length} hình`);
 }
 
 // ---------------- render ----------------
@@ -117,6 +233,7 @@ function render(force) {
     ind.style.top = top; ind.style.background = getComputedStyle(b).backgroundColor;
   }
   if (lastTheme !== S.theme) { lastTheme = S.theme; if (P.isDesktop) window.desktop.setTheme?.(S.theme); P.setSystemBars(S.theme); }
+  hydrateImgs();
   const pwIn = app.querySelector('.pw input');
   if (pwIn && !S.dlg && !app.querySelector('.pw input:focus')) pwIn.focus();
   for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
@@ -244,7 +361,7 @@ function tab2() {
   const dp = cur ? `<div class="dpane"><div class="dhead">${S.compact ? `<button class="back" data-act="back2" aria-label="Quay lại">${I.back}</button>` : ''}
       <h2 contenteditable="plaintext-only" data-edit="note-name">${esc(cur.name)}</h2><button class="more" data-act="note-menu" aria-label="Tùy chọn" title="Xóa">${I.dots}</button></div>
       <div class="meta">Sửa lần cuối ${fmtDate(cur.editedAt)} · tự lưu</div>
-      <div class="editor" contenteditable="true" spellcheck="false" data-edit="note-body">${clean(cur.body)}</div></div>`
+      <div class="editor" contenteditable="true" spellcheck="false" data-edit="note-body">${paint(clean(cur.body))}</div></div>`
     : `<div class="dpane"><div class="empty"><b>Chọn một phần mềm</b>Hoặc bấm + để thêm mới.</div></div>`;
   if (S.compact) return `<div class="ld">${S.t2open && cur ? dp : lp}</div>`;
   return `<div class="ld">${lp}${dp}</div>`;
@@ -350,6 +467,7 @@ function accEditor(a) {
 // ---------- hộp thoại ----------
 function dialog() {
   if (!S.dlg) return '';
+  if (S.dlg.type === 'img') return `<div class="ov lightbox" data-act="ov-img"><img src="${S.dlg.src}" alt=""></div>`;
   if (S.dlg.type === 'confirm') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2><p>${esc(S.dlg.text)}</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Hủy</button><button class="btn pri" data-act="dlg-ok">${esc(S.dlg.ok || 'Xóa')}</button></div></div></div>`;
   if (S.dlg.type === 'prompt') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2>
@@ -505,7 +623,7 @@ app.addEventListener('click', async e => {
     }
     case 'settings': S.dlg = { type: 'settings' }; break;
     case 'sync-info': { const u = DB.currentUser(); toast(SYNC_TXT(DB.syncState.status) + (u ? ' · ' + u.email : '')); return; }
-    case 'ov': case 'dlg-close': S.dlg = null; break;
+    case 'ov': case 'dlg-close': case 'ov-img': S.dlg = null; break;
     case 'dlg-ok': { const dl = S.dlg; S.dlg = null; const v = document.getElementById('dlgin'); dl.fn(v ? v.value.trim() : true); break; }
     case 'theme': S.theme = d.v; setPref('theme', d.v); break;
     case 'upd-check': S.updManual = true; P.checkUpdate(); return;
@@ -538,7 +656,7 @@ app.addEventListener('click', async e => {
     case 'back2': S.t2open = false; break;
     case 'note-menu': {
       const n = DB.get('notes', S.t2sel);
-      popover(el, `<button class="mi danger" data-del="1">${I.trash}Xóa "${esc(n.name)}"</button>`, () => confirmDlg('Xóa ghi chú?', `Ghi chú "${n.name}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('notes', n.id); S.t2sel = null; S.t2open = false; render(true); }));
+      popover(el, `<button class="mi danger" data-del="1">${I.trash}Xóa "${esc(n.name)}"</button>`, () => confirmDlg('Xóa ghi chú?', `Ghi chú "${n.name}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { (n.body || '').replace(/data-img="([^"]+)"/g, (_, id) => IMG.remove(id)); DB.remove('notes', n.id); S.t2sel = null; S.t2open = false; render(true); }));
       return;
     }
     // tab 3
@@ -584,9 +702,11 @@ app.addEventListener('click', async e => {
       vaultCache.push(S.newAcc); S.editAcc = S.newAcc.id; S.t3new = true; S.q = ''; render(true); app.querySelector('[data-ae="title"]')?.focus(); return;
     case 'acc-menu': {
       const ac = vaultCache.find(x => x.id === d.id);
-      popover(el, `<button class="mi" data-ed="1">${I.pen}Sửa</button><button class="mi danger" data-del="1">${I.trash}Xóa tài khoản</button>`, o => {
+      const others = groups().filter(g => g.id !== ac.groupId);
+      popover(el, `<button class="mi" data-ed="1">${I.pen}Sửa</button>${others.length ? `<button class="mi" data-mv="1">${I.move}Chuyển sang nhóm…</button>` : ''}<button class="mi danger" data-del="1">${I.trash}Xóa thẻ</button>`, o => {
+        if (o.mv) return setTimeout(() => popover(el, `<div class="pop-t">Chuyển "${esc(ac.title)}" sang</div>${others.map(g => `<button class="mi" data-g="${g.id}">${esc(g.name)}</button>`).join('')}`, o2 => o2.g && moveAcc(d.id, o2.g)));
         if (o.ed) { S.editAcc = d.id; S.t3new = false; render(true); app.querySelector('#accedit')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-        if (o.del) confirmDlg('Xóa tài khoản?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); render(true); toast('Đã xóa'); });
+        if (o.del) confirmDlg('Xóa thẻ?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); render(true); toast('Đã xóa'); });
       });
       return;
     }
@@ -661,7 +781,7 @@ app.addEventListener('input', e => {
   if (kind === 'stk-title') debounce('st' + t.dataset.s, () => stkUpdate(t.dataset.s, s => { s.title = t.textContent.trim(); }));
   if (kind === 'it') { const r = t.closest('.it'); debounce('it' + r.dataset.i, () => stkUpdate(r.dataset.s, s => { const it = s.items.find(x => x.id === r.dataset.i); if (it) it.text = t.textContent; })); }
   if (kind === 'note-name') { const id = S.t2sel; debounce('nn' + id, () => { const n = DB.get('notes', id); n && DB.put('notes', { ...n, name: t.textContent.trim() || 'Không tên', editedAt: Date.now() }); }); }
-  if (kind === 'note-body') { const id = S.t2sel; debounce('nb' + id, () => { const n = DB.get('notes', id); n && DB.put('notes', { ...n, body: clean(t.innerHTML), editedAt: Date.now() }); }, 700); }
+  if (kind === 'note-body') { const id = S.t2sel; debounce('nb' + id, () => saveNoteBody(id, t), 700); }
 });
 app.addEventListener('keydown', e => {
   const t = e.target;
@@ -686,6 +806,7 @@ app.addEventListener('focusout', e => {
 // dán chữ thường vào ghi chú (bỏ định dạng web lạ)
 app.addEventListener('paste', e => {
   const t = e.target.closest('[data-edit]'); if (!t) return;
+  if (t.dataset.edit === 'note-body') return pasteRich(e, t);
   e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
 });
 
@@ -709,13 +830,15 @@ let hold = null, drag = null, eatClick = false;
 const SORTS = [
   { item: '.stk', box: '.wall', key: el => el.dataset.s || 'gio', ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
   { item: '.acc[data-id]', box: '.acc-wrap', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK && !S.editAcc && !S.q, save: ids => saveAccOrder(ids) },
-  { item: '.li[data-act="note-pick"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 2 && S.t2sort === 'manual', save: ids => saveNoteOrder(ids) }
+  { item: '.li[data-act="note-pick"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 2, save: ids => saveNoteOrder(ids), list: true },
+  { item: '.li[data-act="g"]', box: '.list', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK, save: ids => saveGroupOrder(ids), list: true }
 ];
 app.addEventListener('pointerdown', e => {
   if (e.button > 0 || e.target.closest('input,button,.pop,.ov')) return;
   for (const cfg of SORTS) {
     const el = e.target.closest(cfg.item);
-    if (el && cfg.ok()) { hold = { cfg, el, x: e.clientX, y: e.clientY, t: setTimeout(startDrag, HOLD_MS) }; return; }
+    // PC + danh sách tab con: nhấn giữ chuột rồi kéo là đi luôn (m-skill: di chuột > 4px); còn lại: giữ ~0.3s
+    if (el && cfg.ok()) { const quick = cfg.list && e.pointerType === 'mouse'; hold = { cfg, el, quick, x: e.clientX, y: e.clientY, t: quick ? 0 : setTimeout(startDrag, HOLD_MS) }; return; }
   }
 });
 function cancelHold() { if (hold) { clearTimeout(hold.t); hold = null; } }
@@ -738,7 +861,7 @@ function follow() {
   el.style.translate = `${dx}px ${drag.py - drag.offY - r.top}px`;
 }
 window.addEventListener('pointermove', e => {
-  if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) cancelHold();
+  if (hold) { const dist = Math.hypot(e.clientX - hold.x, e.clientY - hold.y); if (hold.quick) { if (dist > 4) startDrag(); } else if (dist > 8) cancelHold(); }
   if (!drag) return;
   e.preventDefault();
   drag.px = e.clientX; drag.py = e.clientY;
@@ -760,6 +883,11 @@ window.addEventListener('pointermove', e => {
       if (Math.abs(dx) > .5 || Math.abs(dy) > .5) x.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 260, easing: EASE });
     }
   } else if (!over) drag.last = null;
+  if (drag.cfg.item === '.acc[data-id]') {
+    const g = document.elementFromPoint(e.clientX, e.clientY)?.closest('.lpane .li[data-act="g"]');
+    const tg = g && g.dataset.id !== S.t3g ? g : null;
+    if (tg !== drag.grp) { drag.grp?.classList.remove('drop-target'); tg?.classList.add('drop-target'); drag.grp = tg; }
+  }
   follow();
 }, { passive: false });
 window.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
@@ -768,8 +896,9 @@ app.addEventListener('contextmenu', e => { if (drag || hold) e.preventDefault();
 function endDrag() {
   cancelHold();
   if (!drag) return;
-  const { cfg, el, box } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 60);
+  const { cfg, el, box, grp } = drag; drag = null; eatClick = true; setTimeout(() => { eatClick = false; }, 60);
   app.classList.remove('dragging-stk');
+  if (grp) { grp.classList.remove('drop-target'); return moveAcc(el.dataset.id, grp.dataset.id); }
   const ids = [...box.querySelectorAll(cfg.item)].map(cfg.key);
   // mục đang kéo bay về chỗ mới
   const k = cfg.key(el);
@@ -794,7 +923,18 @@ function saveAccOrder(ids) {
   // đổi thứ tự trong bộ nhớ ngay (để vẽ lại đúng), mã hóa + lưu chạy sau
   ids.forEach((id, i) => { const v = vaultCache.find(x => x.id === id); if (v && v.order !== i) { v.order = i; saveVault(v); } });
 }
+function saveGroupOrder(ids) {
+  ids.forEach((id, i) => { const g = vaultCache.find(x => x.id === id); if (g && g.order !== i) { g.order = i; saveVault(g); } });
+}
+// chuyển 1 thẻ sang nhóm khác (đặt cuối nhóm mới)
+function moveAcc(id, gid) {
+  const a = vaultCache.find(x => x.id === id), g = vaultCache.find(x => x.id === gid);
+  if (!a || !g || a.groupId === gid) return render(true);
+  a.groupId = gid; a.order = accsOf(gid).length; saveVault(a);
+  render(true); toast(`Đã chuyển "${a.title}" sang ${g.name}`);
+}
 function saveNoteOrder(ids) {
+  if (S.t2sort !== 'manual') { S.t2sort = 'manual'; setPref('t2sort', 'manual'); }
   quiet = true;
   ids.forEach((id, i) => { const n = DB.get('notes', id); if (n && n.order !== i) DB.put('notes', { ...n, order: i }); });
   quiet = false;
@@ -822,7 +962,9 @@ DB.onChange(async c => {
   if (c === 'vault' && MK && !S.editAcc) await refreshVault();
   render();
 });
-DB.onAuth(() => render(true));
+DB.onAuth(u => { if (u) IMG.uploadPending(); render(true); });
+// bấm đúp vào hình trong ghi chú để xem lớn
+app.addEventListener('dblclick', e => { const im = e.target.closest('.editor img[src]'); if (im) { S.dlg = { type: 'img', src: im.src }; render(true); } });
 
 // cập nhật
 P.onUpdate(u => {

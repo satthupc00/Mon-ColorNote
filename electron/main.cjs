@@ -85,6 +85,16 @@ ipcMain.handle('upd:check', async () => {
 ipcMain.handle('upd:download', () => autoUpdater.downloadUpdate());
 ipcMain.handle('upd:install', () => autoUpdater.quitAndInstall(true, true));
 ipcMain.handle('app:version', () => app.getVersion());
+// dán từ Word: hình nằm trong file tạm (file:///...clip_image001.png) — đọc giúp trang web
+ipcMain.handle('clip:readImage', (_e, fileUrl) => {
+  try {
+    const p = require('url').fileURLToPath(fileUrl);
+    const ext = path.extname(p).toLowerCase().slice(1);
+    const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp' }[ext];
+    if (!mime || fs.statSync(p).size > 25 * 1024 * 1024) return null;
+    return `data:${mime};base64,` + fs.readFileSync(p).toString('base64');
+  } catch { return null; }
+});
 ipcMain.handle('app:theme', (_e, t) => {
   const b = BAR[t] || BAR.dark;
   try { fs.writeFileSync(themeFile, t); } catch {}
