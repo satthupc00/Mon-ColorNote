@@ -321,9 +321,9 @@ function fabHtml() {
 // ---------- Tab 1 ----------
 const rotOf = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 7) - 3) * .5; };
 const DONE_MAX = 3;
-// Sticker cố định: Đám giỗ má — mất ngày 30/9 âm lịch năm Tân Sửu (= 04/11/2021 dương lịch).
-// Mỗi năm tự đổi 30/9 âm ra ngày dương; năm nào tháng 9 âm chỉ có 29 ngày thì giỗ ngày 29.
-const GIO_DEATH = [4, 11, 2021];
+// Sticker cố định: Đám giỗ má — mất ngày 30/9/2021 dương lịch (= 24/8 âm lịch năm Tân Sửu).
+// Giỗ theo ngày âm: mỗi năm tự đổi 24/8 âm ra ngày dương.
+const GIO_DEATH = [30, 9, 2021];
 const WD = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 const pad2 = n => String(n).padStart(2, '0');
 function gioSticker() {
@@ -346,7 +346,7 @@ function gioSticker() {
     <div class="gio-h">${I.lotus}<b>Đám giỗ má</b>${tog}</div>
     <div class="gio-date"><small>${WD[d.getDay()]}</small>${pad2(solar[0])}/${pad2(solar[1])}/${solar[2]}</div>
     ${chip}
-    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất 30/9 âm lịch năm ${canChi(GIO_DEATH[2])}</div>
+    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất ${pad2(GIO_DEATH[0])}/${pad2(GIO_DEATH[1])}/${GIO_DEATH[2]}</div>
   </div>`;
 }
 function stickerHtml(s) {
