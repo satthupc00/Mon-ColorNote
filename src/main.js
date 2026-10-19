@@ -696,7 +696,8 @@ app.addEventListener('click', async e => {
       if (t === 3 && S.tab !== 3 && MK && autoLock() && leftTab3At && Date.now() - leftTab3At > 60000) lockVault();
       if (t === 3 && S.tab !== 3) S.show = {};
       S.tab = t; setPref('tab', t);
-      if (t === 3 && !MK && secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false)) { render(true); return bioUnlock(); }
+      autoBioWant = t === 3;
+      if (t === 3 && canAutoBio()) { autoBioWant = false; render(true); return bioUnlock(); }
       break;
     }
     case 'settings': S.dlg = { type: 'settings' }; break;
@@ -1208,6 +1209,13 @@ function saveNoteOrder(ids) {
 // rời app (chuyển sang app khác) là khóa Tab Đỏ; quay lại Tab Đỏ thì hỏi vân tay lại
 let bioBusy = false, bioEndAt = 0;
 const canAutoBio = () => S.tab === 3 && !MK && !!secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false) && !S.dlg;
+// chờ đủ điều kiện (két đã nạp, biết máy có vân tay) rồi hỏi vân tay đúng 1 lần
+let autoBioWant = false, autoBioT = 0;
+function tryAutoBio() {
+  if (!autoBioWant || document.hidden || !canAutoBio()) return;
+  autoBioWant = false; clearTimeout(autoBioT);
+  autoBioT = setTimeout(() => canAutoBio() ? bioUnlock() : null, 350); // đợi màn hình Android sẵn sàng mới gọi cảm biến
+}
 const autoLock = () => !P.isDesktop || pref('pcAutoLock', false);
 function onLeaveApp() {
   if (bioBusy || !MK || !autoLock()) return;
@@ -1215,7 +1223,7 @@ function onLeaveApp() {
 }
 function onBackToApp() {
   if (bioBusy || Date.now() - bioEndAt < 1500) return;
-  if (canAutoBio()) bioUnlock();
+  autoBioWant = true; tryAutoBio();
 }
 document.addEventListener('visibilitychange', () => document.hidden ? onLeaveApp() : onBackToApp());
 if (P.isDesktop) { window.addEventListener('blur', onLeaveApp); window.addEventListener('focus', onBackToApp); }
@@ -1227,6 +1235,7 @@ DB.onChange(async c => {
   if (c === 'meta') { const m = secMeta(); if (MK && (!m || m.keyId !== MKID)) { lockVault(); await P.keyClear(); setPref('bioKey', false); } }
   if (c === 'vault' && MK && !S.editAcc) await refreshVault();
   render();
+  if (c === 'meta') tryAutoBio();
 });
 // ---------- Android: nút Back ----------
 // Back = lùi 1 màn: đóng bảng/menu → lưu & thoát chỗ đang sửa → về danh sách → (màn chính) bấm 2 lần để thoát
@@ -1270,7 +1279,7 @@ app.addEventListener('input', e => {
   const r = sel.getRangeAt(0).getBoundingClientRect(), ed = e.target, er = ed.getBoundingClientRect();
   if (r.bottom && r.bottom > er.bottom - 24) ed.scrollTop += r.bottom - er.bottom + 48;
 });
-DB.onAuth(u => { if (u) IMG.uploadPending(); render(true); });
+DB.onAuth(u => { if (u) IMG.uploadPending(); render(true); tryAutoBio(); });
 // bấm đúp vào hình trong ghi chú để xem lớn
 app.addEventListener('dblclick', e => { const gn = e.target.closest('.gname'); if (gn && !S.g2ren) { S.g2ren = gn.dataset.g; render(true); startRename(); } });
 function startRename() { const el = app.querySelector('.gname[contenteditable]'); if (!el) return; el.focus(); getSelection().selectAllChildren(el); }
@@ -1293,7 +1302,8 @@ P.onUpdate(u => {
   S.bio = await P.bioAvailable();
   render(true);
   // mở app đang ở Tab Đỏ: hỏi vân tay luôn, không cần bấm biểu tượng
-  if (canAutoBio()) setTimeout(() => canAutoBio() && bioUnlock(), 350);
+  // (đã đăng nhập thì két chỉ có sau khi tài khoản nạp xong → tryAutoBio chạy lại ở onAuth / onChange)
+  autoBioWant = true; tryAutoBio();
   DB.initSync().catch(() => {});
   setTimeout(() => P.checkUpdate(), 3000);
 })();
