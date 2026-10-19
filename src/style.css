@@ -427,3 +427,62 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .tools2 .sortseg button{padding:5px 7px;white-space:nowrap}
 
 .app{transition:padding-bottom .18s var(--ease-out)}
+
+/* ---- Sticker giỗ: thu gọn / mở rộng ---- */
+.gio-h b{flex:1}
+.gio-tog{width:30px;height:30px;margin:-6px -8px -6px 0;border:0;background:none;color:var(--mu);border-radius:9px;display:grid;place-items:center;transition:rotate var(--t-med) var(--ease-out),background-color var(--t-fast)}
+.gio-tog:hover{background:var(--surf2);color:var(--tx)}
+.gio-tog[aria-expanded="false"]{rotate:-90deg}
+.stk.gio.closed{padding:12px 16px}
+.gio-mini{display:flex;align-items:center;gap:8px;margin-top:8px;font:700 18px var(--f-disp);font-variant-numeric:tabular-nums}
+
+/* ---- Tab Đỏ: thẻ chỉ còn thanh tiêu đề + popup nội dung ---- */
+.acc.mini .acc-h{cursor:pointer;border-radius:16px;transition:background-color var(--t-fast)}
+.acc.mini .acc-h:hover{background:var(--hov)}
+.acc.mini .acc-h:active{background:var(--sel)}
+.acc-wrap:has(.acc.mini){gap:8px}
+.accdlg{width:min(520px,100%);padding:16px}
+.acc-dh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.acc-dh .av{width:34px;height:34px;border-radius:11px;background:var(--r-soft);color:var(--red);display:grid;place-items:center;font:800 14px var(--f-disp);flex:0 0 auto}
+.acc-dh b{flex:1;min-width:0;font:700 18px/1.25 var(--f-disp);overflow-wrap:anywhere}
+.accdlg .acc-b{background:var(--surf2);border-radius:14px;padding:10px 10px 12px;max-height:min(56vh,520px);overflow:auto}
+.accdlg .acc-b .ln{font-size:14.5px}
+.acc-hint{font-size:11.5px;color:var(--mu);font-weight:700;text-align:center;margin-top:8px}
+.accdlg .acc-edit{padding:0}
+.accdlg .acc-edit textarea.field{min-height:min(40vh,320px)}
+
+/* ---- Tab Xanh dương: thanh định dạng ---- */
+.dpane{position:relative}
+.ntb{display:flex;align-items:center;gap:2px;margin:0 18px 8px;padding:4px;background:var(--surf);border:1px solid var(--line);border-radius:12px;overflow-x:auto;scrollbar-width:none;flex:0 0 auto}
+.ntb::-webkit-scrollbar{display:none}
+.compact .ntb{margin:0 12px 8px}
+.ntb button{height:32px;min-width:34px;border:0;background:none;color:var(--tx);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:3px;font:800 15px var(--f-ui);padding:0 7px;flex:0 0 auto}
+.touch .ntb button{height:40px;min-width:42px}
+.ntb button:hover{background:var(--hov)}
+.ntb button[aria-pressed="true"],.ntb button[aria-expanded="true"]{background:var(--sel);color:var(--red)}
+.ntb button svg:last-child:not(:first-child){opacity:.6}
+.ntb .sep{width:1px;height:20px;background:var(--line);margin:0 4px;flex:0 0 auto}
+.ntb .aa{font-weight:800;font-size:16px}.ntb .aa small{font-size:11px}
+.ntb .cdot{width:16px;height:16px;border-radius:50%;background:conic-gradient(#E5383B,#E8B500,#30A46C,#3E8BF0,#8E6CEF,#E5383B);box-shadow:0 0 0 2px var(--surf),0 0 0 3px var(--line)}
+.ntb-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-2px 18px 8px;padding:6px;background:var(--surf);border:1px solid var(--line);border-radius:12px;animation:rise .2s var(--ease-out) both;flex:0 0 auto}
+.compact .ntb-sub{margin:-2px 12px 8px}
+.ntb-sub[hidden]{display:none}
+.szb{border:1px solid var(--line);background:none;color:var(--tx);border-radius:9px;padding:4px 12px;font-weight:700;min-height:36px}
+.szb:hover{border-color:var(--red);color:var(--red)}
+.swc{width:30px;height:30px;border-radius:50%;border:2px solid var(--surf);box-shadow:0 0 0 1px var(--line);padding:0}
+.touch .swc{width:36px;height:36px}
+.swc:hover{scale:1.12;box-shadow:0 0 0 2px var(--red)}
+.swc.def{background:linear-gradient(135deg,var(--tx) 0 50%,var(--surf2) 50%)}
+/* hình trong ghi chú: bấm để chọn, kéo góc để đổi cỡ */
+.editor img{cursor:pointer}
+.editor img.sel{outline:2px solid var(--red);outline-offset:2px}
+.imgbox{position:absolute;pointer-events:none;z-index:5}
+.imgbox .ibar{position:absolute;left:8px;top:8px;display:flex;gap:2px;padding:3px;background:var(--surf);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);pointer-events:auto;animation:rise .18s var(--ease-out) both;white-space:nowrap}
+.imgbox .ibar button{border:0;background:none;color:var(--tx);border-radius:7px;font:800 12px var(--f-ui);padding:5px 8px;display:grid;place-items:center}
+.touch .imgbox .ibar button{padding:8px 10px}
+.imgbox .ibar button:hover{background:var(--hov)}
+.imgbox .ibar button[aria-pressed="true"]{background:var(--sel);color:var(--red)}
+.imgbox .ibar [data-idel]:hover{color:var(--red)}
+.imgbox .ih{position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;border-radius:50%;background:var(--red);border:3px solid var(--surf);box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:auto;cursor:nwse-resize;touch-action:none}
+.touch .imgbox .ih{width:26px;height:26px;right:-13px;bottom:-13px}
+@media (prefers-reduced-motion: reduce){.ntb-sub,.imgbox .ibar{animation:none}}

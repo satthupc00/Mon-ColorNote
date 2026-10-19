@@ -31,7 +31,7 @@ const fmtDate = t => {
 const S = {
   tab: pref('tab', 1), theme: pref('theme', 'dark'),
   t2sel: null, t2sort: pref('t2sort', 'manual'), t2open: false, t2new: false,
-  doneOpen: pref('doneOpen', {}), gclosed: pref('gclosed', {}), g2ren: null,
+  doneOpen: pref('doneOpen', {}), gioClosed: pref('gioClosed', false), gclosed: pref('gclosed', {}), g2ren: null,
   t3: 'lock', pin: '', pin1: '', pinErr: '', recovery: '', t3g: null, q: '', closed: pref('closed', {}), show: {}, editAcc: null, t3new: false,
   dlg: null, upd: { ev: 'idle' }, version: '', compact: false, wide: false, bio: false, bioOn: pref('bio', true),
   login: { email: '', msg: '', err: false, busy: false }
@@ -97,6 +97,8 @@ function normColor(c) {
 function lum(hex) { const n = parseInt(hex.slice(1), 16); return (.299 * (n >> 16) + .587 * (n >> 8 & 255) + .114 * (n & 255)) / 255; }
 function mix(hex, to, t) { const a = parseInt(hex.slice(1), 16), b = parseInt(to.slice(1), 16); const ch = s => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; }
 const themed = hex => { const L = lum(hex); return S.theme === 'dark' ? (L < .5 ? mix(hex, '#ffffff', .5 - L * .4) : hex) : (L > .72 ? mix(hex, '#000000', .45) : hex); };
+// data-c="def" = trả về màu chữ mặc định (dùng khi bỏ màu bên trong đoạn đã tô màu)
+const tcolor = c => c === 'def' ? 'var(--tx)' : themed(c);
 function fontPx(v) {
   const m = /^([\d.]+)(pt|px)$/.exec((v || '').trim()); if (!m) return null;
   const px = +m[1] * (m[2] === 'pt' ? 4 / 3 : 1);
@@ -119,9 +121,10 @@ function clean(html, paste) {
       const fs = c.getAttribute('data-fs') || fontPx(st.fontSize);
       const fw = st.fontWeight, bold = fw === 'bold' || +fw >= 600, notBold = fw === 'normal' || (+fw && +fw < 600);
       const ital = st.fontStyle === 'italic', deco = (st.textDecoration || st.textDecorationLine || '');
-      const imgId = c.getAttribute('data-img'), imgSrc = c.getAttribute('src');
+      const imgId = c.getAttribute('data-img'), imgSrc = c.getAttribute('src'), imgW = +c.getAttribute('data-w');
       if (tag === 'IMG') {
         [...c.attributes].forEach(a => c.removeAttribute(a.name));
+        if (imgW >= 5 && imgW <= 100) c.setAttribute('data-w', Math.round(imgW));
         if (imgId) c.setAttribute('data-img', imgId);
         else if (paste && imgSrc) c.setAttribute('data-src', imgSrc);
         else { c.remove(); continue; }
@@ -158,8 +161,9 @@ function paint(html) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
   doc.querySelectorAll('[data-c],[data-fs]').forEach(el => {
     const c = el.getAttribute('data-c'), f = el.getAttribute('data-fs');
-    el.setAttribute('style', (c ? `color:${themed(c)};` : '') + (f ? `font-size:${f}px;` : ''));
+    el.setAttribute('style', (c ? `color:${tcolor(c)};` : '') + (f ? `font-size:${f}px;` : ''));
   });
+  doc.querySelectorAll('img[data-w]').forEach(el => { el.style.width = el.getAttribute('data-w') + '%'; });
   doc.querySelectorAll('img[data-img]').forEach(el => el.setAttribute('alt', ''));
   return doc.body.firstChild.innerHTML;
 }
@@ -317,8 +321,9 @@ function fabHtml() {
 // ---------- Tab 1 ----------
 const rotOf = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 7) - 3) * .5; };
 const DONE_MAX = 3;
-// Sticker cố định: Đám giỗ má (ngày mất 31/10/2021 dương lịch), tự tính ngày dương lịch theo từng năm
-const GIO_DEATH = [31, 10, 2021];
+// Sticker cố định: Đám giỗ má — mất ngày 30/9 âm lịch năm Tân Sửu (= 04/11/2021 dương lịch).
+// Mỗi năm tự đổi 30/9 âm ra ngày dương; năm nào tháng 9 âm chỉ có 29 ngày thì giỗ ngày 29.
+const GIO_DEATH = [4, 11, 2021];
 const WD = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 const pad2 = n => String(n).padStart(2, '0');
 function gioSticker() {
@@ -327,15 +332,21 @@ function gioSticker() {
   const { lunar, solar } = deathAnniversary(GIO_DEATH, y);
   const d = new Date(solar[2], solar[1] - 1, solar[0]);
   const days = Math.round((d - today) / 86400000);
+  const closed = !!S.gioClosed;
   let chip;
   if (days > 0) chip = `<span class="gio-chip">Còn ${days} ngày</span>`;
   else if (days === 0) chip = `<span class="gio-chip today">Hôm nay</span>`;
   else { const n = deathAnniversary(GIO_DEATH, y + 1).solar; chip = `<span class="gio-chip past">Đã qua · năm sau ${pad2(n[0])}/${pad2(n[1])}/${n[2]}</span>`; }
+  const tog = `<button class="gio-tog" data-act="gio-tog" aria-expanded="${!closed}" title="${closed ? 'Mở rộng' : 'Thu gọn'}" aria-label="${closed ? 'Mở rộng' : 'Thu gọn'}">${I.chev}</button>`;
+  if (closed) return `<div class="stk gio closed" aria-label="Đám giỗ má">
+    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b>${tog}</div>
+    <div class="gio-mini"><b>${pad2(solar[0])}/${pad2(solar[1])}</b>${days > 0 ? `<span class="gio-chip">Còn ${days} ngày</span>` : chip}</div>
+  </div>`;
   return `<div class="stk gio" aria-label="Đám giỗ má">
-    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b></div>
+    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b>${tog}</div>
     <div class="gio-date"><small>${WD[d.getDay()]}</small>${pad2(solar[0])}/${pad2(solar[1])}/${solar[2]}</div>
     ${chip}
-    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất ${pad2(GIO_DEATH[0])}/${pad2(GIO_DEATH[1])}/${GIO_DEATH[2]}</div>
+    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất 30/9 âm lịch năm ${canChi(GIO_DEATH[2])}</div>
   </div>`;
 }
 function stickerHtml(s) {
@@ -385,11 +396,27 @@ function tab2() {
   const dp = cur ? `<div class="dpane"><div class="dhead">${S.compact ? `<button class="back" data-act="back2" aria-label="Quay lại">${I.back}</button>` : ''}
       <div style="flex:1;min-width:0"><div class="crumb">${esc(cg ? cg.name : '')}</div><h2 contenteditable="plaintext-only" data-edit="note-name">${esc(cur.name)}</h2></div><button class="more" data-act="note-menu" aria-label="Tùy chọn" title="Chuyển nhóm / xóa">${I.dots}</button></div>
       <div class="meta">Sửa lần cuối ${fmtDate(cur.editedAt)} · tự lưu</div>
+      ${noteToolbar()}
       <div class="editor" contenteditable="true" spellcheck="false" data-edit="note-body">${paint(clean(cur.body))}</div></div>`
     : `<div class="dpane"><div class="empty"><b>Chọn một ghi chú</b>Hoặc bấm + trên dòng tên nhóm để thêm mới.</div></div>`;
   if (S.compact) return `<div class="ld">${S.t2open && cur ? dp : lp}</div>`;
   return `<div class="ld">${lp}${dp}</div>`;
 }
+// thanh định dạng ghi chú (m-skill: nút icon có tooltip + phím tắt). Không dùng data-act để bấm không làm vẽ lại.
+function noteToolbar() {
+  return `<div class="ntb" role="toolbar" aria-label="Định dạng chữ">
+    <button type="button" data-fmt="bold" title="In đậm (Ctrl+B)" aria-label="In đậm"><b>B</b></button>
+    <button type="button" data-fmt="italic" title="In nghiêng (Ctrl+I)" aria-label="In nghiêng"><i style="font-family:serif;font-size:16px">I</i></button>
+    <button type="button" data-fmt="underline" title="Gạch dưới (Ctrl+U)" aria-label="Gạch dưới"><u>U</u></button>
+    <span class="sep"></span>
+    <button type="button" data-fmt="size" title="Cỡ chữ" aria-label="Cỡ chữ" aria-expanded="false"><span class="aa">A<small>A</small></span>${I.caret}</button>
+    <button type="button" data-fmt="color" title="Màu chữ" aria-label="Màu chữ" aria-expanded="false"><span class="cdot"></span>${I.caret}</button>
+    <span class="sep"></span>
+    <button type="button" data-fmt="img" title="Dán hình đang copy (Ctrl+V)" aria-label="Dán hình">${I.img}</button>
+  </div><div class="ntb-sub" hidden></div>`;
+}
+const SIZES = [['Nhỏ', 12], ['Thường', 14], ['Lớn', 19], ['Rất lớn', 25]];
+const COLORS = ['#E5383B', '#F2994A', '#E8B500', '#30A46C', '#22B8C4', '#3E8BF0', '#8E6CEF', '#E5579B', '#8B8D98'];
 function hue(s) { const cols = ['#F29A9C', '#86BDF0', '#F2B84B', '#7FD49B', '#B9A6F5', '#F5A6D8', '#7ED6D6']; let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return cols[h % cols.length]; }
 
 // ---------- Tab 3 ----------
@@ -454,20 +481,12 @@ function tab3() {
   if (!S.t3g && gs.length) S.t3g = gs[0].id;
   const g = gs.find(x => x.id === S.t3g);
   const q = S.q.trim().toLowerCase();
-  const list = g ? accsOf(g.id).filter(a => !q || (a.title || '').toLowerCase().includes(q) || a.id === S.editAcc) : [];
+  const list = g ? accsOf(g.id).filter(a => !q || (a.title || '').toLowerCase().includes(q)) : [];
   const hl = t => { t = t || ''; const i = q ? t.toLowerCase().indexOf(q) : -1; return i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length)); };
-  const card = a => {
-    if (S.editAcc === a.id) return accEditor(a);
-    const on = !!S.show[a.id], lines = accBody(a).split('\n');
-    // hiện: mỗi cụm chữ liền nhau là 1 ô bấm để copy; ẩn: mỗi dòng thành 1 thanh mờ
-    const shown = lines.map(l => l.trim() ? `<div class="ln">${l.split(/(\s+)/).map(w => w.trim() ? `<span class="tok" data-act="tok" title="Bấm để copy">${esc(w)}</span>` : esc(w)).join('')}</div>` : '<div class="ln blank"></div>').join('');
-    const masked = `<div class="mask">${lines.filter(l => l.trim()).map(l => `<i style="width:${Math.min(100, 22 + l.length * 2.6)}%"></i>`).join('') || '<i style="width:30%"></i>'}<small>Nội dung đang ẩn</small></div>`;
-    return `<div class="acc${enter('a' + a.id)}" data-id="${a.id}">
-      <div class="acc-h"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b class="acc-t">${hl(a.title)}</b>
-      <button class="eye" data-act="eye" data-id="${a.id}" aria-pressed="${on}" title="${on ? 'Ẩn nội dung' : 'Hiện nội dung'}" aria-label="${on ? 'Ẩn nội dung' : 'Hiện nội dung'}">${on ? I.eyeOff : I.eye}</button>
-      <button class="more" data-act="acc-menu" data-id="${a.id}" title="Sửa / xóa" aria-label="Tùy chọn thẻ">${I.dots}</button></div>
-      <div class="acc-b${on ? ' reveal' : ''}">${on ? (accBody(a).trim() ? shown : '<div class="ln muted">Trống</div>') : masked}</div></div>`;
-  };
+  // thẻ thu gọn chỉ còn thanh tiêu đề; bấm vào mở popup xem nội dung
+  const card = a => `<div class="acc mini${enter('a' + a.id)}" data-id="${a.id}">
+      <div class="acc-h" data-act="acc-open" data-id="${a.id}" title="Bấm để xem nội dung"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b class="acc-t">${hl(a.title)}</b>
+      <button class="more" data-act="acc-menu" data-id="${a.id}" title="Sửa / chuyển nhóm / xóa" aria-label="Tùy chọn thẻ">${I.dots}</button></div></div>`;
   const body = `<div class="dpane">
     ${S.compact ? `<div class="chips">${gs.map(x => `<button class="chip" data-act="g" data-id="${x.id}" aria-pressed="${x.id === S.t3g}">${esc(x.name)}</button>`).join('')}<button class="chip" data-act="g-new" aria-label="Thêm nhóm" title="Thêm nhóm">${I.plus14}</button>${g ? `<button class="chip" data-act="g-menu" data-id="${g.id}" aria-label="Đổi tên hoặc xóa nhóm" title="Đổi tên / xóa nhóm">${I.dots}</button>` : ''}</div>` : ''}
     ${g ? `<div class="search">${I.search}<input id="q3" placeholder="Tìm tiêu đề trong ${esc(g.name)}…" value="${esc(S.q)}" autocomplete="off"></div>
@@ -480,11 +499,24 @@ function tab3() {
 }
 // nội dung thẻ: dữ liệu cũ dạng từng ô (fields) tự chuyển thành các dòng "Tên: giá trị"
 const accBody = a => a.body ?? (a.fields || []).filter(f => f.k || f.v).map(f => f.k ? `${f.k}: ${f.v}` : f.v).join('\n');
-function accEditor(a) {
-  return `<div class="acc" data-id="${a.id}"><div class="acc-edit" id="accedit">
+// popup thẻ: xem (bấm chữ để copy) hoặc sửa
+function accDialog() {
+  const a = vaultCache.find(v => v.id === S.dlg.id) || (S.newAcc && S.newAcc.id === S.dlg.id ? S.newAcc : null);
+  if (!a) return '';
+  if (S.editAcc === a.id) return `<div class="ov"><div class="dlg accdlg" role="dialog" aria-label="Sửa thẻ"><div class="acc-edit" id="accedit">
     <input class="field" data-ae="title" value="${esc(a.title)}" placeholder="Tiêu đề, ví dụ: Gmail công việc" style="font-weight:800">
     <textarea class="field" data-ae="body" placeholder="Nội dung: tài khoản, mật khẩu, ghi chú…" spellcheck="false">${esc(accBody(a))}</textarea>
     <div class="acts">${S.t3new ? '' : `<button class="btn ghost danger" data-act="acc-del" data-id="${a.id}">Xóa</button>`}<span class="sp"></span><button class="btn" data-act="ae-cancel">Hủy</button><button class="btn pri" data-act="ae-save">Lưu</button></div>
+  </div></div></div>`;
+  const text = accBody(a);
+  // mỗi cụm chữ liền nhau là 1 ô bấm để copy
+  const lines = text.split('\n').map(l => l.trim() ? `<div class="ln">${l.split(/(\s+)/).map(w => w.trim() ? `<span class="tok" data-act="tok" title="Bấm để copy">${esc(w)}</span>` : esc(w)).join('')}</div>` : '<div class="ln blank"></div>').join('');
+  return `<div class="ov" data-act="ov"><div class="dlg accdlg" role="dialog" aria-label="${esc(a.title)}">
+    <div class="acc-dh"><span class="av">${esc((a.title || '?')[0].toUpperCase())}</span><b>${esc(a.title)}</b>
+      <button class="ibtn" data-act="acc-edit" data-id="${a.id}" title="Sửa (E) · lưu bằng Ctrl+S" aria-label="Sửa">${I.pen}</button>
+      <button class="ibtn" data-act="dlg-close" title="Đóng (Esc)" aria-label="Đóng">${I.x}</button></div>
+    <div class="acc-b">${text.trim() ? lines : '<div class="ln muted">Trống · bấm bút chì để thêm nội dung</div>'}</div>
+    ${text.trim() ? '<div class="acc-hint">Bấm vào chữ để copy</div>' : ''}
   </div></div>`;
 }
 
@@ -495,6 +527,7 @@ function dialog() {
     <div class="upd-ic">${I.refresh}</div><h2><span>Bản ${esc(S.updVersion || 'mới')} đã tải xong</span></h2>
     <p>Bấm "Cài ngay" để Mon TriNote tự đóng, cài bản mới rồi mở lại. Ghi chú của bạn đã được lưu, không mất gì.</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Để sau</button><button class="btn pri" data-act="upd-restart">Cài ngay</button></div></div></div>`;
+  if (S.dlg.type === 'acc') return accDialog();
   if (S.dlg.type === 'img') return `<div class="ov lightbox" data-act="ov-img"><img src="${S.dlg.src}" alt=""></div>`;
   if (S.dlg.type === 'confirm') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2><p>${esc(S.dlg.text)}</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Hủy</button><button class="btn pri" data-act="dlg-ok">${esc(S.dlg.ok || 'Xóa')}</button></div></div></div>`;
@@ -612,7 +645,7 @@ async function setUnlocked(mk, b64, keyId, saveForBio) {
   if (saveForBio && S.bio && S.bioOn && await P.keySave(b64)) setPref('bioKey', true);
   await refreshVault();
 }
-function lockVault() { MK = null; MKB64 = null; MKID = null; vaultCache = []; S.t3 = 'lock'; S.pin = ''; S.pinErr = ''; S.editAcc = null; S.show = {}; S.q = ''; }
+function lockVault() { MK = null; MKB64 = null; MKID = null; vaultCache = []; S.t3 = 'lock'; S.pin = ''; S.pinErr = ''; S.editAcc = null; S.newAcc = null; S.show = {}; S.q = ''; if (S.dlg?.type === 'acc') S.dlg = null; }
 async function bioUnlock() {
   const meta = secMeta(); if (!meta || bioBusy) return;
   bioBusy = true;
@@ -627,6 +660,23 @@ async function bioUnlock() {
     S.t3 = 'open'; S.pinErr = '';
   } catch { S.t3 = 'pin'; S.pinErr = 'Hãy nhập PIN'; }
   render(true);
+}
+function focusAccEditor(which) {
+  const el = app.querySelector(`[data-ae="${which}"]`); if (!el) return;
+  el.focus(); if (el.setSelectionRange) { const n = el.value.length; el.setSelectionRange(n, n); }
+}
+// Hủy sửa: thẻ mới thì đóng popup, thẻ cũ thì quay về chế độ xem
+function cancelAccEdit() {
+  if (S.t3new) S.dlg = null;
+  S.editAcc = null; S.t3new = false; S.newAcc = null;
+}
+// Lưu xong quay về chế độ xem trong popup
+async function saveAccEdit() {
+  const n = collectAccEditor(); if (!n) return;
+  if (!n.title) n.title = 'Không tên';
+  await saveVault(n);
+  S.editAcc = null; S.t3new = false; S.newAcc = null;
+  if (S.dlg?.type === 'acc') S.dlg.id = n.id;
 }
 function collectAccEditor() {
   const box = document.getElementById('accedit'); if (!box) return null;
@@ -667,6 +717,7 @@ app.addEventListener('click', async e => {
       setTimeout(() => flip('.stk', x => x.dataset.s || 'gio', () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
       return;
     }
+    case 'gio-tog': S.gioClosed = !S.gioClosed; setPref('gioClosed', S.gioClosed); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); return;
     case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); return; }
     case 'it-del': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); break; }
     case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); toast('Đã xóa các mục đã xong'); return; }
@@ -755,23 +806,24 @@ app.addEventListener('click', async e => {
       });
       return;
     }
-    case 'eye': S.show[d.id] = !S.show[d.id]; break;
+    case 'acc-open': S.dlg = { type: 'acc', id: d.id }; S.editAcc = null; break;
+    case 'acc-edit': S.editAcc = d.id; S.t3new = false; render(true); focusAccEditor('body'); return;
     case 'tok': { el.classList.remove('copied'); void el.offsetWidth; el.classList.add('copied'); copy(el.textContent); return; }
     case 'acc-new': S.newAcc = { id: DB.uid(), kind: 'acc', groupId: S.t3g, title: '', order: accsOf(S.t3g).length, body: '' };
-      vaultCache.push(S.newAcc); S.editAcc = S.newAcc.id; S.t3new = true; S.q = ''; render(true); app.querySelector('[data-ae="title"]')?.focus(); return;
+      S.editAcc = S.newAcc.id; S.t3new = true; S.q = ''; S.dlg = { type: 'acc', id: S.newAcc.id }; render(true); focusAccEditor('title'); return;
     case 'acc-menu': {
       const ac = vaultCache.find(x => x.id === d.id);
       const others = groups().filter(g => g.id !== ac.groupId);
       popover(el, `<button class="mi" data-ed="1">${I.pen}Sửa</button>${others.length ? `<button class="mi" data-mv="1">${I.move}Chuyển sang nhóm…</button>` : ''}<button class="mi danger" data-del="1">${I.trash}Xóa thẻ</button>`, o => {
         if (o.mv) return setTimeout(() => popover(el, `<div class="pop-t">Chuyển "${esc(ac.title)}" sang</div>${others.map(g => `<button class="mi" data-g="${g.id}">${esc(g.name)}</button>`).join('')}`, o2 => o2.g && moveAcc(d.id, o2.g)));
-        if (o.ed) { S.editAcc = d.id; S.t3new = false; render(true); app.querySelector('#accedit')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        if (o.ed) { S.dlg = { type: 'acc', id: d.id }; S.editAcc = d.id; S.t3new = false; render(true); focusAccEditor('body'); }
         if (o.del) confirmDlg('Xóa thẻ?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); render(true); toast('Đã xóa'); });
       });
       return;
     }
-    case 'ae-cancel': if (S.t3new) vaultCache = vaultCache.filter(v => v.id !== S.editAcc); S.editAcc = null; S.t3new = false; await refreshVault(); break;
-    case 'ae-save': { const n = collectAccEditor(); if (!n.title) n.title = 'Không tên'; await saveVault(n); S.editAcc = null; S.t3new = false; S.newAcc = null; S.show[n.id] = false; toast('Đã lưu, nội dung đã ẩn'); break; }
-    case 'acc-del': { const ac = vaultCache.find(x => x.id === d.id); confirmDlg('Xóa tài khoản?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); S.editAcc = null; render(true); }); return; }
+    case 'ae-cancel': cancelAccEdit(); break;
+    case 'ae-save': await saveAccEdit(); toast('Đã lưu'); break;
+    case 'acc-del': { const ac = vaultCache.find(x => x.id === d.id); confirmDlg('Xóa thẻ?', `"${ac.title}" sẽ bị xóa trên mọi máy.`, 'Xóa', () => { deleteVault(d.id); S.editAcc = null; render(true); toast('Đã xóa'); }); return; }
     // tài khoản đồng bộ
     case 'signin': case 'signup': case 'resetpass': {
       const email = document.getElementById('lg-email').value.trim(), pass = document.getElementById('lg-pass').value;
@@ -874,12 +926,131 @@ app.addEventListener('paste', e => {
   e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
 });
 
+// ---------- Tab Xanh dương: thanh định dạng + chỉnh cỡ hình ----------
+let edRange = null;
+const curEd = () => app.querySelector('.editor[data-edit="note-body"]');
+// nhớ chỗ bôi đen trong ghi chú để bấm nút trên thanh công cụ (điện thoại mất focus) vẫn áp đúng chỗ
+document.addEventListener('selectionchange', () => {
+  const ed = curEd(), sel = getSelection();
+  if (ed && sel.rangeCount && ed.contains(sel.anchorNode)) { edRange = sel.getRangeAt(0).cloneRange(); syncTb(); }
+});
+function restoreSel(ed) {
+  if (document.activeElement !== ed) ed.focus({ preventScroll: true });
+  if (edRange && ed.contains(edRange.startContainer)) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(edRange); }
+}
+function syncTb() {
+  const tb = app.querySelector('.ntb'); if (!tb) return;
+  for (const c of ['bold', 'italic', 'underline']) { const b = tb.querySelector(`[data-fmt="${c}"]`); let on = false; try { on = document.queryCommandState(c); } catch {} b.setAttribute('aria-pressed', on); }
+}
+const edChanged = ed => { syncTb(); ed.dispatchEvent(new Event('input', { bubbles: true })); };
+// bọc chỗ bôi đen bằng span màu / cỡ chữ (dùng fontName làm dấu tạm để trình duyệt tự tách đoạn)
+function applySpan(ed, attr, val) {
+  restoreSel(ed);
+  const sel = getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return toast(attr === 'data-c' ? 'Bôi đen chữ trước rồi chọn màu' : 'Bôi đen chữ trước rồi chọn cỡ chữ');
+  document.execCommand('styleWithCSS', false, false);
+  document.execCommand('fontName', false, 'tn-mark');
+  const css = attr === 'data-c' ? 'color' : 'fontSize', spans = [];
+  ed.querySelectorAll('font[face="tn-mark"]').forEach(f => {
+    f.querySelectorAll(`[${attr}]`).forEach(x => { x.removeAttribute(attr); x.style[css] = ''; });
+    const sp = document.createElement('span');
+    // bỏ màu mà đoạn ngoài đang có màu → đặt "màu mặc định" để đè lên
+    const v = val ?? (f.parentElement.closest(`[${attr}]`) ? (attr === 'data-c' ? 'def' : 14) : null);
+    if (v != null) { sp.setAttribute(attr, v); sp.style[css] = attr === 'data-c' ? tcolor(v) : v + 'px'; }
+    sp.append(...f.childNodes); f.replaceWith(sp); spans.push(sp);
+  });
+  if (spans.length) { const r = document.createRange(); r.setStartBefore(spans[0]); r.setEndAfter(spans[spans.length - 1]); sel.removeAllRanges(); sel.addRange(r); edRange = r.cloneRange(); }
+  edChanged(ed);
+}
+function toggleSub(kind) {
+  const tb = app.querySelector('.ntb'), sub = app.querySelector('.ntb-sub'); if (!sub) return;
+  const open = sub.dataset.k !== kind || sub.hidden;
+  tb.querySelectorAll('[aria-expanded]').forEach(b => b.setAttribute('aria-expanded', open && b.dataset.fmt === kind));
+  sub.hidden = !open; sub.dataset.k = open ? kind : '';
+  if (!open) return;
+  sub.innerHTML = kind === 'size'
+    ? SIZES.map(([n, px]) => `<button type="button" class="szb" data-size="${px}" title="${n}" style="font-size:${Math.min(px, 21)}px">${n}</button>`).join('')
+    : `<button type="button" class="swc def" data-color="" title="Màu mặc định" aria-label="Màu mặc định"></button>` + COLORS.map(c => `<button type="button" class="swc" data-color="${c}" style="background:${themed(c)}" title="${c}" aria-label="Màu ${c}"></button>`).join('');
+}
+// nút "Dán hình": đọc hình đang copy (PC đọc qua Electron, điện thoại qua clipboard của trình duyệt)
+async function pasteImgBtn(ed) {
+  let data = null;
+  try {
+    if (window.desktop?.clipImage) data = await window.desktop.clipImage();
+    else for (const it of await navigator.clipboard.read()) { const t = it.types.find(x => x.startsWith('image/')); if (t) { data = await it.getType(t); break; } }
+  } catch { return toast('Không đọc được clipboard. Bấm giữ trong ghi chú rồi chọn Dán'); }
+  if (!data) return toast('Chưa copy hình nào. Copy 1 hình rồi bấm lại nhé');
+  restoreSel(ed);
+  toast('Đang lưu hình…');
+  const id = await IMG.save(await IMG.compress(data));
+  const im = document.createElement('img'); im.setAttribute('data-img', id); im.src = await IMG.load(id);
+  const sel = getSelection(); let rg = sel.rangeCount ? sel.getRangeAt(0) : null;
+  if (!rg || !ed.contains(rg.commonAncestorContainer)) { rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); }
+  rg.deleteContents(); rg.insertNode(im); rg.setStartAfter(im); rg.collapse(true); sel.removeAllRanges(); sel.addRange(rg);
+  edChanged(ed); toast('Đã dán hình · bấm vào hình để chỉnh cỡ');
+}
+// giữ focus + chỗ bôi đen khi bấm thanh công cụ / khung chỉnh hình
+app.addEventListener('mousedown', e => { if (e.target.closest('.ntb,.ntb-sub,.imgbox')) e.preventDefault(); });
+app.addEventListener('click', e => {
+  const ed = curEd(); if (!ed) return;
+  const b = e.target.closest('[data-fmt],[data-size],[data-color],[data-iw],[data-idel]');
+  if (b) {
+    if (b.dataset.fmt === 'size' || b.dataset.fmt === 'color') return toggleSub(b.dataset.fmt);
+    if (b.dataset.fmt === 'img') return pasteImgBtn(ed);
+    if (b.dataset.fmt) { restoreSel(ed); document.execCommand('styleWithCSS', false, false); document.execCommand(b.dataset.fmt); return edChanged(ed); }
+    if (b.dataset.size) { applySpan(ed, 'data-fs', +b.dataset.size === 14 ? null : +b.dataset.size); return toggleSub('size'); }
+    if (b.dataset.color !== undefined) { applySpan(ed, 'data-c', b.dataset.color || null); return toggleSub('color'); }
+    if (b.dataset.iw && selImg) { setImgW(+b.dataset.iw); return edChanged(ed); }
+    if (b.dataset.idel && selImg) { selImg.remove(); hideImgBox(); return edChanged(ed); }
+  }
+  const im = e.target.closest('.editor img[src]');
+  if (im) showImgBox(im); else if (!e.target.closest('.imgbox')) hideImgBox();
+});
+// bấm vào hình: hiện khung có nút kéo góc + các cỡ nhanh
+let selImg = null;
+function edInnerW(ed) { const cs = getComputedStyle(ed); return ed.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); }
+function setImgW(pct) { pct = Math.round(Math.max(10, Math.min(100, pct))); selImg.style.width = pct + '%'; selImg.setAttribute('data-w', pct); placeImgBox(); }
+function showImgBox(im) {
+  selImg = im; const pane = im.closest('.dpane');
+  let box = pane.querySelector('.imgbox');
+  if (!box) {
+    box = document.createElement('div'); box.className = 'imgbox';
+    box.innerHTML = `<div class="ibar">${[25, 50, 75, 100].map(p => `<button type="button" data-iw="${p}">${p}%</button>`).join('')}<button type="button" data-idel="1" title="Xóa hình" aria-label="Xóa hình">${I.trash}</button></div><span class="ih" title="Kéo để đổi cỡ hình"></span>`;
+    pane.appendChild(box);
+    box.querySelector('.ih').addEventListener('pointerdown', resizeStart);
+  }
+  app.querySelectorAll('.editor img.sel').forEach(x => x.classList.remove('sel'));
+  im.classList.add('sel'); placeImgBox();
+}
+function hideImgBox() { selImg?.classList.remove('sel'); selImg = null; app.querySelector('.imgbox')?.remove(); }
+function placeImgBox() {
+  const box = app.querySelector('.imgbox'); if (!box || !selImg) return;
+  if (!selImg.isConnected) return hideImgBox();
+  const r = selImg.getBoundingClientRect(), pr = box.parentNode.getBoundingClientRect();
+  Object.assign(box.style, { left: r.left - pr.left + 'px', top: r.top - pr.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  box.querySelectorAll('[data-iw]').forEach(b => b.setAttribute('aria-pressed', b.dataset.iw === selImg.getAttribute('data-w') || (!selImg.getAttribute('data-w') && b.dataset.iw === '100')));
+}
+function resizeStart(e) {
+  e.preventDefault(); e.stopPropagation();
+  const ed = curEd(), h = e.currentTarget; if (!ed || !selImg) return;
+  h.setPointerCapture(e.pointerId);
+  const left = selImg.getBoundingClientRect().left, inner = edInnerW(ed);
+  const mv = ev => setImgW((ev.clientX - left) / inner * 100);
+  const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); edChanged(ed); };
+  h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+}
+app.addEventListener('scroll', e => { if (e.target.classList?.contains('editor')) placeImgBox(); }, true);
+window.addEventListener('resize', () => placeImgBox());
+app.addEventListener('input', e => { if (e.target.dataset?.edit === 'note-body') requestAnimationFrame(placeImgBox); });
+
 // phím tắt
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (S.dlg) { S.dlg = null; render(true); } closePop(); return; }
+  if (e.key === 'Escape') { if (S.editAcc) { cancelAccEdit(); render(true); } else if (S.dlg) { S.dlg = null; render(true); } closePop(); return; }
+  if (S.dlg?.type === 'acc' && !S.editAcc && !editing() && e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); S.editAcc = S.dlg.id; S.t3new = false; render(true); focusAccEditor('body'); return; }
   if (S.tab === 3 && !MK && !textMode() && /^[0-9]$/.test(e.key) && !editing() && !S.dlg && S.t3 !== 'forgot') { pinKey(e.key); return; }
   if (S.tab === 3 && !MK && !textMode() && e.key === 'Backspace' && !editing() && !S.dlg) { pinKey('⌫'); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
+  if (S.editAcc && (e.key.toLowerCase() === 's' || e.key === 'Enter')) { e.preventDefault(); saveAccEdit().then(() => { toast('Đã lưu'); render(true); }); return; }
   if (['1', '2', '3'].includes(e.key)) { e.preventDefault(); app.querySelector(`.tabbtn[data-t="${e.key}"]`)?.click(); }
   if (e.key === ',') { e.preventDefault(); S.dlg = { type: 'settings' }; render(true); }
   if (e.key.toLowerCase() === 'n' && !editing()) { e.preventDefault(); if (S.tab === 1) stkNew(); else if (S.tab === 2) app.querySelector('[data-act="note-new"]')?.click(); else app.querySelector('[data-act="acc-new"]')?.click(); }
@@ -1036,6 +1207,7 @@ function saveNoteOrder(ids) {
 
 // rời app (chuyển sang app khác) là khóa Tab Đỏ; quay lại Tab Đỏ thì hỏi vân tay lại
 let bioBusy = false, bioEndAt = 0;
+const canAutoBio = () => S.tab === 3 && !MK && !!secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false) && !S.dlg;
 const autoLock = () => !P.isDesktop || pref('pcAutoLock', false);
 function onLeaveApp() {
   if (bioBusy || !MK || !autoLock()) return;
@@ -1043,7 +1215,7 @@ function onLeaveApp() {
 }
 function onBackToApp() {
   if (bioBusy || Date.now() - bioEndAt < 1500) return;
-  if (S.tab === 3 && !MK && secMeta() && S.t3 === 'lock' && S.bio && S.bioOn && pref('bioKey', false) && !S.dlg) bioUnlock();
+  if (canAutoBio()) bioUnlock();
 }
 document.addEventListener('visibilitychange', () => document.hidden ? onLeaveApp() : onBackToApp());
 if (P.isDesktop) { window.addEventListener('blur', onLeaveApp); window.addEventListener('focus', onBackToApp); }
@@ -1061,8 +1233,9 @@ DB.onChange(async c => {
 let backAt = 0;
 P.onBack(async () => {
   if (app.querySelector('.pop')) return closePop();
+  // đang sửa thẻ: lưu rồi về chế độ xem
+  if (S.editAcc) { await saveAccEdit(); toast('Đã lưu'); return render(true); }
   if (S.dlg) { S.dlg = null; return render(true); }
-  if (S.editAcc) { const n = collectAccEditor(); if (n) { if (!n.title) n.title = 'Không tên'; await saveVault(n); S.show[n.id] = false; toast('Đã lưu'); } S.editAcc = null; S.t3new = false; S.newAcc = null; return render(true); }
   const a = document.activeElement;
   if (a && app.contains(a) && (a.isContentEditable || /INPUT|TEXTAREA/.test(a.tagName))) { flushSaves(); a.blur(); if (S.tab !== 2 || !S.t2open) return render(true); }
   flushSaves();
@@ -1119,6 +1292,8 @@ P.onUpdate(u => {
   S.version = await P.appVersion();
   S.bio = await P.bioAvailable();
   render(true);
+  // mở app đang ở Tab Đỏ: hỏi vân tay luôn, không cần bấm biểu tượng
+  if (canAutoBio()) setTimeout(() => canAutoBio() && bioUnlock(), 350);
   DB.initSync().catch(() => {});
   setTimeout(() => P.checkUpdate(), 3000);
 })();

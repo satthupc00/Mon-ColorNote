@@ -1,5 +1,5 @@
 // Mon TriNote — tiến trình chính của Electron (PC)
-const { app, BrowserWindow, ipcMain, safeStorage, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, shell, screen, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -95,6 +95,8 @@ ipcMain.handle('clip:readImage', (_e, fileUrl) => {
     return `data:${mime};base64,` + fs.readFileSync(p).toString('base64');
   } catch { return null; }
 });
+// nút "Dán hình": lấy hình đang có trong clipboard (ảnh chụp màn hình, copy từ Photoshop…)
+ipcMain.handle('clip:image', () => { const im = clipboard.readImage(); return im.isEmpty() ? null : im.toDataURL(); });
 ipcMain.handle('app:theme', (_e, t) => {
   const b = BAR[t] || BAR.dark;
   try { fs.writeFileSync(themeFile, t); } catch {}
