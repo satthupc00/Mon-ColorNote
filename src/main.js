@@ -11,7 +11,6 @@ import * as C from './crypto.js';
 import * as P from './platform.js';
 import { I } from './icons.js';
 import { sampleStickers, sampleNotes, sampleVault } from './sample.js';
-import { deathAnniversary, canChi } from './lunar.js';
 import * as IMG from './images.js';
 
 const app = document.getElementById('app');
@@ -31,7 +30,7 @@ const fmtDate = t => {
 const S = {
   tab: pref('tab', 1), theme: pref('theme', 'dark'),
   t2sel: null, t2sort: pref('t2sort', 'manual'), t2open: false, t2new: false,
-  doneOpen: pref('doneOpen', {}), gioClosed: pref('gioClosed', false), gclosed: pref('gclosed', {}), g2ren: null,
+  doneOpen: pref('doneOpen', {}), gclosed: pref('gclosed', {}), g2ren: null,
   t3: 'lock', pin: '', pin1: '', pinErr: '', recovery: '', t3g: null, q: '', closed: pref('closed', {}), show: {}, editAcc: null, t3new: false,
   dlg: null, upd: { ev: 'idle' }, version: '', compact: false, wide: false, bio: false, bioOn: pref('bio', true),
   login: { email: '', msg: '', err: false, busy: false }
@@ -321,34 +320,6 @@ function fabHtml() {
 // ---------- Tab 1 ----------
 const rotOf = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 7) - 3) * .5; };
 const DONE_MAX = 3;
-// Sticker cố định: Đám giỗ má — mất ngày 30/9/2021 dương lịch (= 24/8 âm lịch năm Tân Sửu).
-// Giỗ theo ngày âm: mỗi năm tự đổi 24/8 âm ra ngày dương.
-const GIO_DEATH = [30, 9, 2021];
-const WD = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-const pad2 = n => String(n).padStart(2, '0');
-function gioSticker() {
-  const now = new Date(), y = now.getFullYear();
-  const today = new Date(y, now.getMonth(), now.getDate());
-  const { lunar, solar } = deathAnniversary(GIO_DEATH, y);
-  const d = new Date(solar[2], solar[1] - 1, solar[0]);
-  const days = Math.round((d - today) / 86400000);
-  const closed = !!S.gioClosed;
-  let chip;
-  if (days > 0) chip = `<span class="gio-chip">Còn ${days} ngày</span>`;
-  else if (days === 0) chip = `<span class="gio-chip today">Hôm nay</span>`;
-  else { const n = deathAnniversary(GIO_DEATH, y + 1).solar; chip = `<span class="gio-chip past">Đã qua · năm sau ${pad2(n[0])}/${pad2(n[1])}/${n[2]}</span>`; }
-  const tog = `<button class="gio-tog" data-act="gio-tog" aria-expanded="${!closed}" title="${closed ? 'Mở rộng' : 'Thu gọn'}" aria-label="${closed ? 'Mở rộng' : 'Thu gọn'}">${I.chev}</button>`;
-  if (closed) return `<div class="stk gio closed" aria-label="Đám giỗ má">
-    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b>${tog}</div>
-    <div class="gio-mini"><b>${pad2(solar[0])}/${pad2(solar[1])}</b>${days > 0 ? `<span class="gio-chip">Còn ${days} ngày</span>` : chip}</div>
-  </div>`;
-  return `<div class="stk gio" aria-label="Đám giỗ má">
-    <div class="gio-h">${I.lotus}<b>Đám giỗ má</b>${tog}</div>
-    <div class="gio-date"><small>${WD[d.getDay()]}</small>${pad2(solar[0])}/${pad2(solar[1])}/${solar[2]}</div>
-    ${chip}
-    <div class="gio-meta">Âm lịch ${lunar.day}/${lunar.month} năm ${canChi(y)}<br>Giỗ năm thứ ${y - GIO_DEATH[2]} · mất ${pad2(GIO_DEATH[0])}/${pad2(GIO_DEATH[1])}/${GIO_DEATH[2]}</div>
-  </div>`;
-}
 function stickerHtml(s) {
   const items = s.items || [];
   const todo = items.filter(x => !x.done), done = items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
@@ -363,9 +334,7 @@ function stickerHtml(s) {
 }
 function tab1() {
   const list = stickers();
-  const gioOrder = (DB.get('meta', 'gio') || {}).order ?? Infinity;
-  const all = [{ gio: true, order: gioOrder }, ...list].sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
-  const body = `<div class="wall">${all.map(x => x.gio ? gioSticker() : stickerHtml(x)).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
+  const body = `<div class="wall">${list.map(stickerHtml).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
   return `<div class="bar"><h2>Bảng sticker</h2>${S.wide ? `<button class="btn pri" data-act="stk-new" title="Sticker mới (Ctrl+N)">${I.plus14}Sticker mới</button>` : ''}</div><div class="scroll">${body}</div>`;
 }
 
@@ -411,6 +380,7 @@ function noteToolbar() {
     <span class="sep"></span>
     <button type="button" data-fmt="size" title="Cỡ chữ" aria-label="Cỡ chữ" aria-expanded="false"><span class="aa">A<small>A</small></span>${I.caret}</button>
     <button type="button" data-fmt="color" title="Màu chữ" aria-label="Màu chữ" aria-expanded="false"><span class="cdot"></span>${I.caret}</button>
+    <button type="button" data-fmt="auto" title="Tự định dạng: đưa cỡ chữ, màu, font về bộ mẫu của app (giữ đậm / nghiêng / gạch dưới)" aria-label="Tự định dạng">${I.wand}</button>
     <span class="sep"></span>
     <button type="button" data-fmt="img" title="Dán hình đang copy (Ctrl+V)" aria-label="Dán hình">${I.img}</button>
   </div><div class="ntb-sub" hidden></div>`;
@@ -593,8 +563,7 @@ const promptDlg = (title, value, ph, fn) => { S.dlg = { type: 'prompt', title, v
 
 // ---------------- Tab 1 actions ----------------
 function stkNew() {
-  const g = (DB.get('meta', 'gio') || {}).order;
-  const order = Math.max(0, ...stickers().map(s => s.order ?? 0), Number.isFinite(g) ? g : 0) + 1;
+  const order = Math.max(0, ...stickers().map(s => s.order ?? 0)) + 1;
   const s = DB.put('stickers', { id: DB.uid(), title: '', color: STK_COLORS[stickers().length % 5], order, items: [] });
   render(true);
   const t = app.querySelector(`.stk-t[data-s="${s.id}"]`); t && t.focus();
@@ -715,13 +684,12 @@ app.addEventListener('click', async e => {
       const r = el.closest('.it'), sid = r.dataset.s, iid = r.dataset.i;
       stkUpdate(sid, s => { const it = s.items.find(x => x.id === iid); it.done = !it.done; it.doneAt = it.done ? Date.now() : 0; }, true);
       // đợi dấu tick hiện xong rồi trượt mục xuống "Đã xong"
-      setTimeout(() => flip('.stk', x => x.dataset.s || 'gio', () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
+      setTimeout(() => flip('.stk', x => x.dataset.s, () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
       return;
     }
-    case 'gio-tog': S.gioClosed = !S.gioClosed; setPref('gioClosed', S.gioClosed); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); return;
-    case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); return; }
+    case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s, () => render(true)); return; }
     case 'it-del': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); break; }
-    case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s || 'gio', () => render(true)); toast('Đã xóa các mục đã xong'); return; }
+    case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
       popover(el, `<div class="sw">${STK_COLORS.map(c => `<button data-c="${c}" aria-pressed="${s.color === c}" style="background:var(--st-${c})" aria-label="Màu"></button>`).join('')}</div><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
@@ -973,6 +941,41 @@ function toggleSub(kind) {
     ? SIZES.map(([n, px]) => `<button type="button" class="szb" data-size="${px}" title="${n}" style="font-size:${Math.min(px, 21)}px">${n}</button>`).join('')
     : `<button type="button" class="swc def" data-color="" title="Màu mặc định" aria-label="Màu mặc định"></button>` + COLORS.map(c => `<button type="button" class="swc" data-color="${c}" style="background:${themed(c)}" title="${c}" aria-label="Màu ${c}"></button>`).join('');
 }
+// Tự định dạng: mỗi cỡ chữ → cỡ mẫu gần nhất, mỗi màu → màu mẫu gần nhất, font về 1 loại; giữ đậm/nghiêng/gạch dưới
+const rgbOf = hex => { const n = parseInt(hex.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
+const nearestColor = hex => { const a = rgbOf(hex); let best = COLORS[0], bd = Infinity; for (const c of COLORS) { const b = rgbOf(c), d = (a[0] - b[0]) ** 2 * .3 + (a[1] - b[1]) ** 2 * .59 + (a[2] - b[2]) ** 2 * .11; if (d < bd) { bd = d; best = c; } } return best; };
+const nearestSize = px => SIZES.map(x => x[1]).reduce((b, v) => Math.abs(v - px) < Math.abs(b - px) || (Math.abs(v - px) === Math.abs(b - px) && v === 14) ? v : b, 14);
+let autoUndo = null;
+function autoFormat(ed) {
+  hideImgBox();
+  const before = ed.innerHTML;
+  // clean() bỏ font chữ, style lạ và chuyển định dạng về data-c / data-fs
+  const doc = new DOMParser().parseFromString(`<div>${clean(before)}</div>`, 'text/html'), root = doc.body.firstChild;
+  let nSize = 0, nColor = 0;
+  root.querySelectorAll('[data-fs]').forEach(el => {
+    const v = nearestSize(+el.getAttribute('data-fs') || 14);
+    if (v !== +el.getAttribute('data-fs')) nSize++;
+    if (v === 14) el.removeAttribute('data-fs'); else el.setAttribute('data-fs', v);
+  });
+  root.querySelectorAll('[data-c]').forEach(el => {
+    const c = el.getAttribute('data-c'); if (c === 'def' || !/^#[0-9a-f]{6}$/i.test(c)) return;
+    const v = nearestColor(c); if (v.toLowerCase() !== c.toLowerCase()) nColor++;
+    el.setAttribute('data-c', v);
+  });
+  // span không còn định dạng gì thì gỡ bỏ cho gọn
+  root.querySelectorAll('span:not([data-c]):not([data-fs])').forEach(sp => sp.replaceWith(...sp.childNodes));
+  ed.innerHTML = paint(root.innerHTML);
+  hydrateImgs();
+  autoUndo = { id: S.t2sel, html: before };
+  edChanged(ed);
+  toast(nSize || nColor ? `Đã tự định dạng (${nSize} cỡ chữ, ${nColor} màu) · Ctrl+Z để hoàn tác` : 'Đã tự định dạng · Ctrl+Z để hoàn tác');
+}
+app.addEventListener('keydown', e => {
+  const ed = e.target.closest?.('.editor[data-edit="note-body"]');
+  if (!ed || !autoUndo) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && autoUndo.id === S.t2sel) { e.preventDefault(); ed.innerHTML = autoUndo.html; autoUndo = null; hydrateImgs(); edChanged(ed); toast('Đã hoàn tác tự định dạng'); return; }
+  if (!e.ctrlKey && !e.metaKey && e.key.length === 1) autoUndo = null; // gõ chữ mới thì thôi giữ bản cũ
+});
 // nút "Dán hình": đọc hình đang copy (PC đọc qua Electron, điện thoại qua clipboard của trình duyệt)
 async function pasteImgBtn(ed) {
   let data = null;
@@ -998,6 +1001,7 @@ app.addEventListener('click', e => {
   if (b) {
     if (b.dataset.fmt === 'size' || b.dataset.fmt === 'color') return toggleSub(b.dataset.fmt);
     if (b.dataset.fmt === 'img') return pasteImgBtn(ed);
+    if (b.dataset.fmt === 'auto') return autoFormat(ed);
     if (b.dataset.fmt) { restoreSel(ed); document.execCommand('styleWithCSS', false, false); document.execCommand(b.dataset.fmt); return edChanged(ed); }
     if (b.dataset.size) { applySpan(ed, 'data-fs', +b.dataset.size === 14 ? null : +b.dataset.size); return toggleSub('size'); }
     if (b.dataset.color !== undefined) { applySpan(ed, 'data-c', b.dataset.color || null); return toggleSub('color'); }
@@ -1064,7 +1068,7 @@ window.addEventListener('keydown', e => {
 const HOLD_MS = 320;
 let hold = null, drag = null, eatClick = false;
 const SORTS = [
-  { item: '.stk', box: '.wall', key: el => el.dataset.s || 'gio', ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
+  { item: '.stk', box: '.wall', key: el => el.dataset.s, ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
   { item: '.acc[data-id]', box: '.acc-wrap', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK && !S.editAcc && !S.q, save: ids => saveAccOrder(ids) },
   { item: '.li[data-act="note-pick"]', box: '.tree', key: el => el.dataset.id, ok: () => S.tab === 2 && !S.g2ren, save: () => saveNoteTree(), list: true, vertical: true },
   { item: '.ngrp', handle: '.gh', box: '.tree', key: el => el.dataset.g, ok: () => S.tab === 2 && !S.g2ren, save: ids => saveNGroupOrder(ids), list: true, vertical: true },
@@ -1072,6 +1076,8 @@ const SORTS = [
 ];
 app.addEventListener('pointerdown', e => {
   if (e.button > 0 || e.target.closest('input,button,.pop,.ov')) return;
+  // PC: bấm chuột vào chữ đang sửa được là để gõ, không bắt đầu giữ-kéo (kéo sticker bằng phần trống / viền)
+  if (e.pointerType === 'mouse' && e.target.closest('[contenteditable]')) return;
   for (const cfg of SORTS) {
     const el = e.target.closest(cfg.item);
     if (el && cfg.handle && !e.target.closest(cfg.handle)) continue;
@@ -1137,7 +1143,7 @@ window.addEventListener('pointermove', e => {
   follow();
 }, { passive: false });
 window.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
-document.addEventListener('selectstart', e => { if (drag || hold) e.preventDefault(); });
+document.addEventListener('selectstart', e => { if (drag || (hold && !e.target.parentElement?.closest('[contenteditable]'))) e.preventDefault(); });
 app.addEventListener('contextmenu', e => { if (drag || hold) e.preventDefault(); });
 function endDrag() {
   cancelHold();
@@ -1161,7 +1167,6 @@ function saveStickerOrder(ids) {
   quiet = true;
   ids.forEach((id, i) => {
     const order = ids.length - i;
-    if (id === 'gio') { if ((DB.get('meta', 'gio') || {}).order !== order) DB.put('meta', { id: 'gio', order }); return; }
     const x = DB.get('stickers', id); if (x && x.order !== order) DB.put('stickers', { ...x, order });
   });
   quiet = false;

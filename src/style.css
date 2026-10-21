@@ -144,17 +144,6 @@ body{background:#1B1D23}
 .li.lift{scale:1.03;z-index:50;position:relative;pointer-events:none;background:var(--surf);box-shadow:0 14px 30px rgba(0,0,0,.35),inset 3px 0 0 var(--red);transition:scale var(--t-med) var(--ease-spring)}
 .dragging-stk,.dragging-stk *{cursor:grabbing!important;user-select:none!important}
 /* sticker cố định: Đám giỗ má */
-.stk.gio{rotate:0deg!important;background:var(--gio-bg);color:var(--tx);border:1.5px solid var(--gio-line);padding:16px 16px 14px;box-shadow:var(--shadow)}
-.stk.gio::before{display:none}
-.stk.gio:hover{rotate:0deg}
-.gio-h{display:flex;align-items:center;gap:8px;color:var(--gio-ink)}
-.gio-h b{font:700 16px var(--f-disp);color:var(--tx)}
-.gio-date{font:700 26px/1.1 var(--f-disp);margin:10px 0 6px;font-variant-numeric:tabular-nums}
-.gio-date small{display:block;font:700 12px var(--f-ui);color:var(--mu);margin-bottom:2px}
-.gio-chip{display:inline-block;font-weight:800;font-size:12px;padding:3px 10px;border-radius:20px;background:var(--gio-chip);color:var(--gio-ink)}
-.gio-chip.today{background:var(--red);color:#fff}
-.gio-chip.past{background:var(--surf2);color:var(--mu)}
-.gio-meta{margin-top:10px;font-size:12px;color:var(--mu);line-height:1.55}
 .done .it-t{text-decoration:line-through}
 
 /* popover menu */
@@ -428,13 +417,6 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 
 .app{transition:padding-bottom .18s var(--ease-out)}
 
-/* ---- Sticker giỗ: thu gọn / mở rộng ---- */
-.gio-h b{flex:1}
-.gio-tog{width:30px;height:30px;margin:-6px -8px -6px 0;border:0;background:none;color:var(--mu);border-radius:9px;display:grid;place-items:center;transition:rotate var(--t-med) var(--ease-out),background-color var(--t-fast)}
-.gio-tog:hover{background:var(--surf2);color:var(--tx)}
-.gio-tog[aria-expanded="false"]{rotate:-90deg}
-.stk.gio.closed{padding:12px 16px}
-.gio-mini{display:flex;align-items:center;gap:8px;margin-top:8px;font:700 18px var(--f-disp);font-variant-numeric:tabular-nums}
 
 /* ---- Tab Đỏ: thẻ chỉ còn thanh tiêu đề + popup nội dung ---- */
 .acc.mini .acc-h{cursor:pointer;border-radius:16px;transition:background-color var(--t-fast)}
