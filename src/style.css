@@ -148,9 +148,9 @@ body{background:#1B1D23}
 
 /* popover menu */
 .pop{position:fixed;z-index:30;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 14px 34px rgba(0,0,0,.3);min-width:190px;animation:dlg .22s var(--ease-spring)}
-.pop .sw{display:flex;gap:6px;padding:6px}
-.pop .sw button{width:26px;height:26px;border-radius:9px;border:2px solid transparent}
-.pop .sw button[aria-pressed="true"]{border-color:var(--red)}
+.pop .swrow{display:flex;gap:6px;padding:6px}
+.pop .swrow button{width:26px;height:26px;border-radius:9px;border:2px solid transparent}
+.pop .swrow button[aria-pressed="true"]{border-color:var(--red)}
 .pop .mi{display:flex;width:100%;align-items:center;gap:8px;border:0;background:transparent;color:var(--tx);padding:8px 10px;border-radius:9px;font-weight:700;font-size:13px;text-align:left}
 .pop .mi:hover{background:var(--hov)}
 .pop .mi.danger{color:var(--red)}

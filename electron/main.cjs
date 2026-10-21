@@ -30,7 +30,7 @@ function createWindow() {
     title: 'Mon TriNote', backgroundColor: BAR[savedTheme()].color, autoHideMenuBar: true,
     titleBarStyle: 'hidden', titleBarOverlay: { ...BAR[savedTheme()], height: 58 },
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, spellcheck: false }
   });
   if (st.maximized) win.maximize();
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

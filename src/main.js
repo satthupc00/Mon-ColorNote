@@ -14,6 +14,9 @@ import { sampleStickers, sampleNotes, sampleVault } from './sample.js';
 import * as IMG from './images.js';
 
 const app = document.getElementById('app');
+// tắt kiểm tra chính tả (gạch đỏ) ở mọi ô gõ chữ
+document.documentElement.spellcheck = false;
+new MutationObserver(() => app.querySelectorAll('[contenteditable]:not([spellcheck]),input:not([spellcheck]),textarea:not([spellcheck])').forEach(el => el.spellcheck = false)).observe(app, { childList: true, subtree: true });
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pref = (k, d) => { try { const v = localStorage.getItem('tn:pref:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('tn:pref:' + k, JSON.stringify(v)); } catch {} };
@@ -692,7 +695,7 @@ app.addEventListener('click', async e => {
     case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
-      popover(el, `<div class="sw">${STK_COLORS.map(c => `<button data-c="${c}" aria-pressed="${s.color === c}" style="background:var(--st-${c})" aria-label="Màu"></button>`).join('')}</div><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
+      popover(el, `<div class="swrow">${STK_COLORS.map(c => `<button data-c="${c}" aria-pressed="${s.color === c}" style="background:var(--st-${c})" aria-label="Màu"></button>`).join('')}</div><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
         o => { if (o.c) stkUpdate(d.s, n => { n.color = o.c; }); if (o.del) return confirmDlg('Xóa sticker?', `"${s.title || 'Sticker'}" và tất cả mục bên trong sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('stickers', d.s); render(true); }); render(true); });
       return;
     }
