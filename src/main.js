@@ -33,7 +33,7 @@ const fmtDate = t => {
 const S = {
   tab: pref('tab', 1), theme: pref('theme', 'dark'),
   t2sel: null, t2sort: pref('t2sort', 'manual'), t2open: false, t2new: false,
-  doneOpen: pref('doneOpen', {}), gclosed: pref('gclosed', {}), g2ren: null,
+  doneOpen: pref('doneOpen', {}), doneFold: pref('doneFold', {}), gclosed: pref('gclosed', {}), g2ren: null,
   t3: 'lock', pin: '', pin1: '', pinErr: '', recovery: '', t3g: null, q: '', closed: pref('closed', {}), show: {}, editAcc: null, t3new: false,
   dlg: null, upd: { ev: 'idle' }, version: '', compact: false, wide: false, bio: false, bioOn: pref('bio', true),
   login: { email: '', msg: '', err: false, busy: false }
@@ -41,7 +41,6 @@ const S = {
 let MK = null, MKB64 = null, MKID = null, vaultCache = [], leftTab3At = 0;
 
 // ---------------- dữ liệu ----------------
-const STK_COLORS = ['y', 'm', 'p', 'l', 's'];
 const stickers = () => DB.all('stickers').sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
 // Tab Xanh dương: nhóm cha (ngroups) chứa các ghi chú (notes.groupId)
 const G_DEFAULT = 'grp-default', G_UNSORTED = 'grp-unsorted'; // id cố định để 2 máy không tạo trùng nhóm
@@ -321,24 +320,29 @@ function fabHtml() {
 }
 
 // ---------- Tab 1 ----------
-const rotOf = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 7) - 3) * .5; };
 const DONE_MAX = 3;
+// thẻ kiểu Google Keep: khung phẳng, viền mỏng, có ghim; "N mục đã xong" bấm để thu gọn
 function stickerHtml(s) {
   const items = s.items || [];
   const todo = items.filter(x => !x.done), done = items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  const open = !!S.doneOpen[s.id], shown = open ? done : done.slice(0, DONE_MAX);
+  const open = !!S.doneOpen[s.id], fold = !!S.doneFold[s.id], shown = open ? done : done.slice(0, DONE_MAX);
   const row = x => `<div class="it" data-s="${s.id}" data-i="${x.id}"><input type="checkbox" ${x.done ? 'checked' : ''} data-act="it-chk" aria-label="Đánh dấu xong"><span class="it-t" contenteditable="plaintext-only" data-edit="it">${esc(x.text)}</span><button class="x" data-act="it-del" aria-label="Xóa mục" title="Xóa mục">${I.x14}</button></div>`;
-  return `<div class="stk ${s.color || 'y'}${enter('s' + s.id)}" style="--rot:${rotOf(s.id)}deg" data-s="${s.id}">
-    <div class="stk-h"><span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span><button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn sticker" title="Đổi màu / xóa">${I.dots}</button></div>
+  const pin = `<button class="pinb" data-act="stk-pin" data-s="${s.id}" aria-pressed="${!!s.pinned}" title="${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}" aria-label="${s.pinned ? 'Bỏ ghim' : 'Ghim'}">${s.pinned ? I.pinF : I.pin}</button>`;
+  return `<div class="stk${s.pinned ? ' pinned' : ''}${enter('s' + s.id)}" data-s="${s.id}">
+    <div class="stk-h"><span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span>${pin}<button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn" title="Ghim / xóa">${I.dots}</button></div>
     ${todo.map(row).join('')}
     <div class="addit">${I.plus14}<input data-add="${s.id}" placeholder="Thêm mục" enterkeyhint="done" aria-label="Thêm mục"></div>
-    ${done.length ? `<div class="done"><div class="done-h">Đã xong (${done.length})${done.length > DONE_MAX ? `<button class="dtog" data-act="done-tog" data-s="${s.id}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem hết'}">${open ? 'Thu gọn' : `+${done.length - DONE_MAX}`}${I.chev}</button>` : ''}<button class="clr" data-act="clr" data-s="${s.id}">Xóa hết</button></div>${shown.map(row).join('')}</div>` : ''}
+    ${done.length ? `<div class="done${fold ? ' fold' : ''}"><div class="done-h"><button class="dfold" data-act="done-fold" data-s="${s.id}" aria-expanded="${!fold}">${I.chev}${done.length} mục đã xong</button>${!fold ? `<button class="clr" data-act="clr" data-s="${s.id}" title="Xóa hết các mục đã xong">Xóa hết</button>` : ''}</div>
+      ${fold ? '' : shown.map(row).join('') + (done.length > DONE_MAX ? `<button class="dmore" data-act="done-tog" data-s="${s.id}">${open ? 'Thu gọn' : `Xem thêm ${done.length - DONE_MAX} mục…`}</button>` : '')}</div>` : ''}
   </div>`;
 }
 function tab1() {
-  const list = stickers();
-  const body = `<div class="wall">${list.map(stickerHtml).join('')}</div>${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để dán tờ đầu tiên lên tường.</div>`}`;
-  return `<div class="bar"><h2>Bảng sticker</h2>${S.wide ? `<button class="btn pri" data-act="stk-new" title="Sticker mới (Ctrl+N)">${I.plus14}Sticker mới</button>` : ''}</div><div class="scroll">${body}</div>`;
+  const list = stickers(), pinned = list.filter(x => x.pinned), others = list.filter(x => !x.pinned);
+  const wall = arr => `<div class="wall">${arr.map(stickerHtml).join('')}</div>`;
+  const body = pinned.length
+    ? `<div class="wsec">Đã ghim</div>${wall(pinned)}${others.length ? `<div class="wsec">Khác</div>${wall(others)}` : ''}`
+    : wall(others);
+  return `<div class="bar"><h2>Bảng sticker</h2>${S.wide ? `<button class="btn pri" data-act="stk-new" title="Sticker mới (Ctrl+N)">${I.plus14}Sticker mới</button>` : ''}</div><div class="scroll">${body}${list.length ? '' : `<div class="empty"><b>Chưa có sticker nào</b>Bấm "Sticker mới" để tạo thẻ đầu tiên.</div>`}</div>`;
 }
 
 // ---------- Tab 2 ----------
@@ -565,9 +569,17 @@ const confirmDlg = (title, text, ok, fn) => { S.dlg = { type: 'confirm', title, 
 const promptDlg = (title, value, ph, fn) => { S.dlg = { type: 'prompt', title, value, ph, fn }; render(true); setTimeout(() => { const i = document.getElementById('dlgin'); i && (i.focus(), i.select()); }, 50); };
 
 // ---------------- Tab 1 actions ----------------
+// ghim / bỏ ghim: chuyển thẻ lên đầu mục mới, các thẻ khác trượt nhường chỗ
+function pinSticker(id) {
+  const s = DB.get('stickers', id); if (!s) return;
+  const pinned = !s.pinned, order = Math.max(0, ...stickers().filter(x => !!x.pinned === pinned).map(x => x.order ?? 0)) + 1;
+  quiet = true; DB.put('stickers', { ...s, pinned, order }); quiet = false;
+  flip('.stk', x => x.dataset.s, () => { parts['p-main'] = null; render(true); });
+  toast(pinned ? 'Đã ghim lên đầu' : 'Đã bỏ ghim');
+}
 function stkNew() {
   const order = Math.max(0, ...stickers().map(s => s.order ?? 0)) + 1;
-  const s = DB.put('stickers', { id: DB.uid(), title: '', color: STK_COLORS[stickers().length % 5], order, items: [] });
+  const s = DB.put('stickers', { id: DB.uid(), title: '', order, items: [] });
   render(true);
   const t = app.querySelector(`.stk-t[data-s="${s.id}"]`); t && t.focus();
 }
@@ -690,13 +702,15 @@ app.addEventListener('click', async e => {
       setTimeout(() => flip('.stk', x => x.dataset.s, () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
       return;
     }
+    case 'done-fold': { const sid = d.s; S.doneFold[sid] = !S.doneFold[sid]; setPref('doneFold', S.doneFold); flip('.stk', x => x.dataset.s, () => render(true)); return; }
+    case 'stk-pin': pinSticker(d.s); return;
     case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s, () => render(true)); return; }
     case 'it-del': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); break; }
     case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
-      popover(el, `<div class="swrow">${STK_COLORS.map(c => `<button data-c="${c}" aria-pressed="${s.color === c}" style="background:var(--st-${c})" aria-label="Màu"></button>`).join('')}</div><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
-        o => { if (o.c) stkUpdate(d.s, n => { n.color = o.c; }); if (o.del) return confirmDlg('Xóa sticker?', `"${s.title || 'Sticker'}" và tất cả mục bên trong sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('stickers', d.s); render(true); }); render(true); });
+      popover(el, `<button class="mi" data-pin="1">${s.pinned ? I.pinF : I.pin}${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</button><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
+        o => { if (o.pin) return pinSticker(d.s); if (o.del) confirmDlg('Xóa sticker?', `"${s.title || 'Sticker'}" và tất cả mục bên trong sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('stickers', d.s); render(true); }); });
       return;
     }
     // tab 2

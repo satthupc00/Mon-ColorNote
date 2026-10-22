@@ -468,3 +468,40 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .imgbox .ih{position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;border-radius:50%;background:var(--red);border:3px solid var(--surf);box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:auto;cursor:nwse-resize;touch-action:none}
 .touch .imgbox .ih{width:26px;height:26px;right:-13px;bottom:-13px}
 @media (prefers-reduced-motion: reduce){.ntb-sub,.imgbox .ibar{animation:none}}
+
+/* ---- Tab Xanh lá: thẻ phẳng kiểu Google Keep + ghim ---- */
+.wsec{max-width:1200px;margin:14px auto 0;padding:0 22px;font:800 11px var(--f-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--mu)}
+.compact .wsec{padding:0 18px;margin-top:10px}
+.wall + .wsec{margin-top:6px}
+.wall{column-gap:14px;padding-top:4px;padding-bottom:20px}
+.wall:last-of-type{padding-bottom:96px}
+.stk{rotate:0deg;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;box-shadow:none;padding:14px 12px 4px;margin:8px 0 10px;transition:box-shadow var(--t-med) var(--ease-out),border-color var(--t-fast),scale var(--t-med) var(--ease-out)}
+.stk::before{display:none}
+.stk:hover{rotate:0deg;border-color:color-mix(in srgb,var(--line) 55%,var(--mu));box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.stk-t{font:600 17px/1.3 var(--f-ui)}
+.stk-h{align-items:flex-start;margin-bottom:8px}
+.pinb{width:30px;height:30px;margin:-4px -4px 0 0;border:0;background:none;color:var(--mu);border-radius:50%;display:grid;place-items:center;flex:0 0 auto;opacity:0;transition:opacity var(--t-fast),background-color var(--t-fast),color var(--t-fast)}
+.stk:hover .pinb,.touch .pinb,.pinb:focus-visible,.pinb[aria-pressed="true"]{opacity:1}
+.touch .pinb[aria-pressed="false"]{opacity:.5}
+.pinb:hover{background:var(--hov);color:var(--tx)}
+.pinb[aria-pressed="true"]{color:var(--tx)}
+.it{font-weight:500;font-size:14px;padding:3px 4px}
+.it input[type=checkbox]{border-radius:3px}
+.addit{opacity:.55}
+.done{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+.done-h{text-transform:none;letter-spacing:0;font-weight:600;font-size:13px;opacity:1;color:var(--mu);padding:0}
+.done-h .dfold{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--mu);font:600 13px var(--f-ui);padding:5px 4px;border-radius:8px}
+.done-h .dfold:hover{background:var(--hov);color:var(--tx)}
+.done-h .dfold svg{transition:rotate var(--t-med) var(--ease-out)}
+.done-h .dfold[aria-expanded="false"] svg{rotate:-90deg}
+.done-h .clr{margin-left:auto;background:none;color:var(--mu);font:600 12px var(--f-ui);padding:4px 8px;border-radius:8px}
+.done-h .clr:hover{background:rgba(229,56,59,.14);color:var(--red)}
+.done .it{opacity:1;color:var(--mu)}
+.dmore{border:0;background:none;color:var(--mu);font:600 12.5px var(--f-ui);padding:4px 4px 2px 30px}
+.dmore:hover{color:var(--tx)}
+.stk-h .more{width:30px;height:30px;margin:-4px -6px 0 -4px;display:grid;place-items:center;opacity:0;color:var(--mu);transition:opacity var(--t-fast)}
+.stk:hover .stk-h .more,.touch .stk-h .more,.stk-h .more:focus-visible{opacity:.8}
+.stk{padding-bottom:10px}
+.wall:not(:last-child),.compact .wall:not(:last-child){padding-bottom:6px}
+.stk.lift{rotate:0deg;box-shadow:0 14px 34px rgba(0,0,0,.4),0 0 0 2px var(--red)}
+.pop .mi svg{flex:0 0 auto}
