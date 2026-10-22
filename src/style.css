@@ -505,3 +505,30 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .wall:not(:last-child),.compact .wall:not(:last-child){padding-bottom:6px}
 .stk.lift{rotate:0deg;box-shadow:0 14px 34px rgba(0,0,0,.4),0 0 0 2px var(--red)}
 .pop .mi svg{flex:0 0 auto}
+
+/* ---- Bảng sticker: xếp gạch (masonry) + thẻ thu gọn trên điện thoại ---- */
+.wall{display:grid;columns:auto;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));grid-auto-rows:2px;column-gap:14px;row-gap:0;align-items:start}
+.wall > .stk,.wall > .stkm{margin:0}
+.wall.mini{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));column-gap:10px}
+.compact .wall.mini{padding-inline:12px}
+.stkm{border:1px solid var(--line);border-radius:12px;padding:12px 12px 10px;background:var(--bg);color:var(--tx);cursor:pointer;overflow:hidden;transition:border-color var(--t-fast),scale var(--t-med) var(--ease-out),box-shadow var(--t-med)}
+.stkm:active{scale:.97}
+.stkm.enter{animation:rise .4s var(--ease-out) both}
+.stkm-t{font:600 16px/1.3 var(--f-ui);margin-bottom:6px;overflow-wrap:anywhere}
+.stkm-i{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.4;margin:3px 0}
+.stkm-i i{width:13px;height:13px;border:1.5px solid var(--mu);border-radius:3px;flex:0 0 auto;margin-top:2px}
+.stkm-i span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.stkm-x{font-size:12.5px;color:var(--mu);margin-top:6px;padding-left:2px}
+.stkm.lift{z-index:50;scale:1.05;pointer-events:none;position:relative;box-shadow:0 14px 34px rgba(0,0,0,.4),0 0 0 2px var(--red)}
+/* thẻ mở to */
+.stkov{align-items:flex-start;padding-top:max(24px,env(safe-area-inset-top))}
+.compact .stkov{padding:0}
+.stkdlg{width:min(560px,100%);padding:0;background:var(--bg);border-radius:18px}
+.compact .stkdlg{border-radius:0;height:100%;max-height:100%;animation:sheetIn .28s var(--ease-out)}
+@keyframes sheetIn{from{opacity:0;translate:0 24px}}
+.stk.big{border:0;margin:0;padding:16px 16px 18px;box-shadow:none}
+.stk.big:hover{box-shadow:none}
+.stk.big .stk-t{font-size:22px}
+.stk.big .pinb,.stk.big .stk-h .more{opacity:1}
+.stk.big .back{margin:-4px 4px 0 -6px;color:var(--tx)}
+.stk.big .it{font-size:15.5px;padding:6px 4px}

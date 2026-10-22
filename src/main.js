@@ -217,7 +217,7 @@ async function pasteRich(e, ed) {
 let pendingRender = false;
 const editing = () => { const a = document.activeElement; return a && app.contains(a) && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); };
 function render(force) {
-  if (!force && editing() && !S.dlg) { pendingRender = true; return; }
+  if (!force && editing() && (!S.dlg || S.dlg.type === 'stk')) { pendingRender = true; return; }
   pendingRender = false;
   const w = window.innerWidth;
   S.compact = w < 600; S.wide = w >= 900;
@@ -254,9 +254,18 @@ function render(force) {
   }
   if (lastTheme !== S.theme) { lastTheme = S.theme; if (P.isDesktop) window.desktop.setTheme?.(S.theme); P.setSystemBars(S.theme); }
   hydrateImgs();
+  layoutWall();
   const pwIn = app.querySelector('.pw input');
   if (pwIn && !S.dlg && !app.querySelector('.pw input:focus')) pwIn.focus();
   for (const [cls, top, left] of scrolls) { const el = app.querySelector('.' + cls); if (el) { el.scrollTop = top; el.scrollLeft = left; } }
+}
+// Xếp gạch (masonry) cho bảng sticker: lưới nhiều cột, mỗi thẻ chiếm số hàng 2px đúng bằng chiều cao của nó,
+// nên thẻ ngắn để lại chỗ trống thì thẻ sau chèn lên. Thứ tự trong DOM giữ nguyên (đọc trái → phải) để kéo thả vẫn đúng.
+const WALL_GAP = 12;
+const spanOf = el => { const h = el.offsetHeight; if (h) el.style.gridRowEnd = 'span ' + Math.ceil((h + WALL_GAP) / 2); };
+const wallRO = new ResizeObserver(es => es.forEach(e => spanOf(e.target)));
+function layoutWall() {
+  app.querySelectorAll('.wall > .stk, .wall > .stkm').forEach(el => { spanOf(el); if (!el._ro) { el._ro = 1; wallRO.observe(el); } });
 }
 // chỉ chạy hiệu ứng xuất hiện cho phần tử mới, không chạy lại mỗi lần vẽ
 let lastTheme = null, shell = null, parts = {};
@@ -322,23 +331,38 @@ function fabHtml() {
 // ---------- Tab 1 ----------
 const DONE_MAX = 3;
 // thẻ kiểu Google Keep: khung phẳng, viền mỏng, có ghim; "N mục đã xong" bấm để thu gọn
-function stickerHtml(s) {
+function stickerHtml(s, big) {
   const items = s.items || [];
   const todo = items.filter(x => !x.done), done = items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const open = !!S.doneOpen[s.id], fold = !!S.doneFold[s.id], shown = open ? done : done.slice(0, DONE_MAX);
   const row = x => `<div class="it" data-s="${s.id}" data-i="${x.id}"><input type="checkbox" ${x.done ? 'checked' : ''} data-act="it-chk" aria-label="Đánh dấu xong"><span class="it-t" contenteditable="plaintext-only" data-edit="it">${esc(x.text)}</span><button class="x" data-act="it-del" aria-label="Xóa mục" title="Xóa mục">${I.x14}</button></div>`;
   const pin = `<button class="pinb" data-act="stk-pin" data-s="${s.id}" aria-pressed="${!!s.pinned}" title="${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}" aria-label="${s.pinned ? 'Bỏ ghim' : 'Ghim'}">${s.pinned ? I.pinF : I.pin}</button>`;
-  return `<div class="stk${s.pinned ? ' pinned' : ''}${enter('s' + s.id)}" data-s="${s.id}">
-    <div class="stk-h"><span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span>${pin}<button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn" title="Ghim / xóa">${I.dots}</button></div>
+  return `<div class="stk${big ? ' big' : ''}${s.pinned ? ' pinned' : ''}${big ? '' : enter('s' + s.id)}" data-s="${s.id}">
+    <div class="stk-h">${big ? `<button class="pinb back" data-act="stk-close" title="Đóng" aria-label="Đóng">${I.back}</button>` : ''}<span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span>${pin}<button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn" title="Ghim / xóa">${I.dots}</button></div>
     ${todo.map(row).join('')}
     <div class="addit">${I.plus14}<input data-add="${s.id}" placeholder="Thêm mục" enterkeyhint="done" aria-label="Thêm mục"></div>
     ${done.length ? `<div class="done${fold ? ' fold' : ''}"><div class="done-h"><button class="dfold" data-act="done-fold" data-s="${s.id}" aria-expanded="${!fold}">${I.chev}${done.length} mục đã xong</button>${!fold ? `<button class="clr" data-act="clr" data-s="${s.id}" title="Xóa hết các mục đã xong">Xóa hết</button>` : ''}</div>
       ${fold ? '' : shown.map(row).join('') + (done.length > DONE_MAX ? `<button class="dmore" data-act="done-tog" data-s="${s.id}">${open ? 'Thu gọn' : `Xem thêm ${done.length - DONE_MAX} mục…`}</button>` : '')}</div>` : ''}
   </div>`;
 }
+// điện thoại: thẻ thu gọn 2 cột (tiêu đề + vài mục đầu), bấm vào mở to để sửa
+const MINI_ITEMS = 8;
+const stkKey = x => x.classList[0] + x.dataset.s; // thẻ nhỏ và thẻ đang mở to cùng id → phân biệt theo class
+function stickerMini(s) {
+  const items = s.items || [], todo = items.filter(x => !x.done), dn = items.length - todo.length;
+  return `<div class="stkm${enter('m' + s.id)}" data-s="${s.id}" data-act="stk-open" role="button" aria-label="Mở ${esc(s.title || 'sticker')}">
+    ${s.title ? `<div class="stkm-t">${esc(s.title)}</div>` : ''}
+    ${todo.slice(0, MINI_ITEMS).map(x => `<div class="stkm-i"><i></i><span>${esc(x.text)}</span></div>`).join('')}
+    ${todo.length > MINI_ITEMS ? `<div class="stkm-x">…</div>` : ''}
+    ${dn ? `<div class="stkm-x">+ ${dn} mục đã xong</div>` : ''}
+    ${!s.title && !items.length ? '<div class="stkm-x">Trống</div>' : ''}
+  </div>`;
+}
+const miniUI = () => phoneUI();
 function tab1() {
   const list = stickers(), pinned = list.filter(x => x.pinned), others = list.filter(x => !x.pinned);
-  const wall = arr => `<div class="wall">${arr.map(stickerHtml).join('')}</div>`;
+  const mini = miniUI();
+  const wall = arr => `<div class="wall${mini ? ' mini' : ''}">${arr.map(x => mini ? stickerMini(x) : stickerHtml(x)).join('')}</div>`;
   const body = pinned.length
     ? `<div class="wsec">Đã ghim</div>${wall(pinned)}${others.length ? `<div class="wsec">Khác</div>${wall(others)}` : ''}`
     : wall(others);
@@ -505,6 +529,7 @@ function dialog() {
     <p>Bấm "Cài ngay" để Mon TriNote tự đóng, cài bản mới rồi mở lại. Ghi chú của bạn đã được lưu, không mất gì.</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Để sau</button><button class="btn pri" data-act="upd-restart">Cài ngay</button></div></div></div>`;
   if (S.dlg.type === 'acc') return accDialog();
+  if (S.dlg.type === 'stk') { const st = DB.get('stickers', S.dlg.id); return st ? `<div class="ov stkov" data-act="ov"><div class="dlg stkdlg" role="dialog" aria-label="${esc(st.title || 'Sticker')}">${stickerHtml(st, true)}</div></div>` : ''; }
   if (S.dlg.type === 'img') return `<div class="ov lightbox" data-act="ov-img"><img src="${S.dlg.src}" alt=""></div>`;
   if (S.dlg.type === 'confirm') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2><p>${esc(S.dlg.text)}</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Hủy</button><button class="btn pri" data-act="dlg-ok">${esc(S.dlg.ok || 'Xóa')}</button></div></div></div>`;
@@ -574,14 +599,22 @@ function pinSticker(id) {
   const s = DB.get('stickers', id); if (!s) return;
   const pinned = !s.pinned, order = Math.max(0, ...stickers().filter(x => !!x.pinned === pinned).map(x => x.order ?? 0)) + 1;
   quiet = true; DB.put('stickers', { ...s, pinned, order }); quiet = false;
-  flip('.stk', x => x.dataset.s, () => { parts['p-main'] = null; render(true); });
+  flip('.stk,.stkm', stkKey, () => { parts['p-main'] = null; render(true); });
   toast(pinned ? 'Đã ghim lên đầu' : 'Đã bỏ ghim');
+}
+// đóng thẻ đang mở to: lưu chỗ đang gõ, thẻ trống thì xóa luôn (giống Keep)
+function closeStk() {
+  flushSaves();
+  const s = DB.get('stickers', S.dlg?.id);
+  if (s && !s.title?.trim() && !(s.items || []).length) DB.remove('stickers', s.id);
+  S.dlg = null;
 }
 function stkNew() {
   const order = Math.max(0, ...stickers().map(s => s.order ?? 0)) + 1;
   const s = DB.put('stickers', { id: DB.uid(), title: '', order, items: [] });
+  if (miniUI()) S.dlg = { type: 'stk', id: s.id };
   render(true);
-  const t = app.querySelector(`.stk-t[data-s="${s.id}"]`); t && t.focus();
+  const t = app.querySelector(`${S.dlg ? '.stkdlg ' : ''}.stk-t[data-s="${s.id}"]`); t && t.focus();
 }
 let quiet = false;
 function stkUpdate(id, fn, silent) { const s = DB.get('stickers', id); if (!s) return; const n = structuredClone(s); fn(n); quiet = !!silent; DB.put('stickers', n); quiet = false; }
@@ -686,7 +719,9 @@ app.addEventListener('click', async e => {
     }
     case 'settings': S.dlg = { type: 'settings' }; break;
     case 'sync-info': { const u = DB.currentUser(); toast(SYNC_TXT(DB.syncState.status) + (u ? ' · ' + u.email : '')); return; }
-    case 'ov': case 'dlg-close': case 'ov-img': S.dlg = null; break;
+    case 'ov': case 'dlg-close': case 'ov-img': if (S.dlg?.type === 'stk') closeStk(); else S.dlg = null; break;
+    case 'stk-open': S.dlg = { type: 'stk', id: d.s }; break;
+    case 'stk-close': closeStk(); break;
     case 'dlg-ok': { const dl = S.dlg; S.dlg = null; const v = document.getElementById('dlgin'); dl.fn(v ? v.value.trim() : true); break; }
     case 'theme': S.theme = d.v; setPref('theme', d.v); break;
     case 'upd-check': S.updManual = true; P.checkUpdate(); return;
@@ -699,14 +734,14 @@ app.addEventListener('click', async e => {
       const r = el.closest('.it'), sid = r.dataset.s, iid = r.dataset.i;
       stkUpdate(sid, s => { const it = s.items.find(x => x.id === iid); it.done = !it.done; it.doneAt = it.done ? Date.now() : 0; }, true);
       // đợi dấu tick hiện xong rồi trượt mục xuống "Đã xong"
-      setTimeout(() => flip('.stk', x => x.dataset.s, () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
+      setTimeout(() => flip('.stk,.stkm', stkKey, () => flip('.stk[data-s="' + sid + '"] .it', x => x.dataset.i, () => render(true))), 220);
       return;
     }
-    case 'done-fold': { const sid = d.s; S.doneFold[sid] = !S.doneFold[sid]; setPref('doneFold', S.doneFold); flip('.stk', x => x.dataset.s, () => render(true)); return; }
+    case 'done-fold': { const sid = d.s; S.doneFold[sid] = !S.doneFold[sid]; setPref('doneFold', S.doneFold); flip('.stk,.stkm', stkKey, () => render(true)); return; }
     case 'stk-pin': pinSticker(d.s); return;
-    case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk', x => x.dataset.s, () => render(true)); return; }
+    case 'done-tog': { const sid = d.s; S.doneOpen[sid] = !S.doneOpen[sid]; setPref('doneOpen', S.doneOpen); flip('.stk,.stkm', stkKey, () => render(true)); return; }
     case 'it-del': { const r = el.closest('.it'); stkUpdate(r.dataset.s, s => { s.items = s.items.filter(x => x.id !== r.dataset.i); }); break; }
-    case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk', x => x.dataset.s, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
+    case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk,.stkm', stkKey, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
       popover(el, `<button class="mi" data-pin="1">${s.pinned ? I.pinF : I.pin}${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</button><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
@@ -1067,7 +1102,7 @@ app.addEventListener('input', e => { if (e.target.dataset?.edit === 'note-body')
 
 // phím tắt
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (S.editAcc) { cancelAccEdit(); render(true); } else if (S.dlg) { S.dlg = null; render(true); } closePop(); return; }
+  if (e.key === 'Escape') { if (S.editAcc) { cancelAccEdit(); render(true); } else if (S.dlg) { if (S.dlg.type === 'stk') closeStk(); else S.dlg = null; render(true); } closePop(); return; }
   if (S.dlg?.type === 'acc' && !S.editAcc && !editing() && e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); S.editAcc = S.dlg.id; S.t3new = false; render(true); focusAccEditor('body'); return; }
   if (S.tab === 3 && !MK && !textMode() && /^[0-9]$/.test(e.key) && !editing() && !S.dlg && S.t3 !== 'forgot') { pinKey(e.key); return; }
   if (S.tab === 3 && !MK && !textMode() && e.key === 'Backspace' && !editing() && !S.dlg) { pinKey('⌫'); return; }
@@ -1086,6 +1121,7 @@ const HOLD_MS = 320;
 let hold = null, drag = null, eatClick = false;
 const SORTS = [
   { item: '.stk', box: '.wall', key: el => el.dataset.s, ok: () => S.tab === 1, save: ids => saveStickerOrder(ids) },
+  { item: '.stkm', box: '.wall', key: el => el.dataset.s, ok: () => S.tab === 1 && !S.dlg, save: ids => saveStickerOrder(ids), free: true },
   { item: '.acc[data-id]', box: '.acc-wrap', key: el => el.dataset.id, ok: () => S.tab === 3 && !!MK && !S.editAcc && !S.q, save: ids => saveAccOrder(ids) },
   { item: '.li[data-act="note-pick"]', box: '.tree', key: el => el.dataset.id, ok: () => S.tab === 2 && !S.g2ren, save: () => saveNoteTree(), list: true, vertical: true },
   { item: '.ngrp', handle: '.gh', box: '.tree', key: el => el.dataset.g, ok: () => S.tab === 2 && !S.g2ren, save: ids => saveNGroupOrder(ids), list: true, vertical: true },
@@ -1099,7 +1135,7 @@ app.addEventListener('pointerdown', e => {
     const el = e.target.closest(cfg.item);
     if (el && cfg.handle && !e.target.closest(cfg.handle)) continue;
     // PC + danh sách tab con: nhấn giữ chuột rồi kéo là đi luôn (m-skill: di chuột > 4px); còn lại: giữ ~0.3s
-    if (el && cfg.ok()) { const quick = cfg.list && e.pointerType === 'mouse'; hold = { cfg, el, quick, x: e.clientX, y: e.clientY, t: quick ? 0 : setTimeout(startDrag, HOLD_MS) }; return; }
+    if (el && cfg.ok() && el.closest(cfg.box)) { const quick = cfg.list && e.pointerType === 'mouse'; hold = { cfg, el, quick, x: e.clientX, y: e.clientY, t: quick ? 0 : setTimeout(startDrag, HOLD_MS) }; return; }
   }
 });
 function cancelHold() { if (hold) { clearTimeout(hold.t); hold = null; } }
@@ -1118,7 +1154,7 @@ function follow() {
   const el = drag.el; el.style.translate = '0 0';
   const r = el.getBoundingClientRect();
   // điện thoại / danh sách 1 cột: chỉ kéo lên xuống
-  const dx = S.compact || drag.cfg.box === '.list' || drag.cfg.vertical ? 0 : drag.px - drag.offX - r.left;
+  const dx = !drag.cfg.free && (S.compact || drag.cfg.box === '.list' || drag.cfg.vertical) ? 0 : drag.px - drag.offX - r.left;
   el.style.translate = `${dx}px ${drag.py - drag.offY - r.top}px`;
 }
 window.addEventListener('pointermove', e => {
@@ -1129,7 +1165,7 @@ window.addEventListener('pointermove', e => {
   const sc = drag.scroller, sr = sc && sc.getBoundingClientRect();
   if (sr) { if (e.clientY < sr.top + 50) sc.scrollTop -= 12; else if (e.clientY > sr.bottom - 50) sc.scrollTop += 12; }
   // màn 1 cột: dò theo trục dọc ở giữa cột để kéo lệch ngang vẫn nhận đúng chỗ
-  const vertical = S.compact || drag.cfg.box === '.list' || drag.cfg.vertical;
+  const vertical = !drag.cfg.free && (S.compact || drag.cfg.box === '.list' || drag.cfg.vertical);
   const bx = vertical ? drag.box.getBoundingClientRect().left + drag.box.clientWidth / 2 : e.clientX;
   const under = document.elementFromPoint(bx, e.clientY);
   let over = under?.closest(drag.cfg.item);
@@ -1266,7 +1302,7 @@ P.onBack(async () => {
   if (app.querySelector('.pop')) return closePop();
   // đang sửa thẻ: lưu rồi về chế độ xem
   if (S.editAcc) { await saveAccEdit(); toast('Đã lưu'); return render(true); }
-  if (S.dlg) { S.dlg = null; return render(true); }
+  if (S.dlg) { if (S.dlg.type === 'stk') closeStk(); else S.dlg = null; return render(true); }
   const a = document.activeElement;
   if (a && app.contains(a) && (a.isContentEditable || /INPUT|TEXTAREA/.test(a.tagName))) { flushSaves(); a.blur(); if (S.tab !== 2 || !S.t2open) return render(true); }
   flushSaves();
