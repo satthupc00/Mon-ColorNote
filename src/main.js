@@ -245,7 +245,10 @@ function render(force) {
   if (mainEl.className !== 'main tint' + S.tab) mainEl.className = 'main tint' + S.tab;
   setPart('p-main', main + fab);
   if (S.wide) setPart('p-foot', footInfo());
-  setPart('p-dlg', dialog());
+  // thẻ đang mở to: chỉ thay ruột thẻ, không vẽ lại cả hộp (tránh chạy lại hiệu ứng mở → nhấp nháy)
+  const sd = S.dlg?.type === 'stk' && app.querySelector(`#p-dlg .stkdlg[data-id="${S.dlg.id}"]`);
+  if (sd) { const st = DB.get('stickers', S.dlg.id), inner = st ? stickerHtml(st, true) : null; if (inner == null) setPart('p-dlg', dialog()); else if (sd._html !== inner) { sd._html = inner; sd.innerHTML = inner; parts['p-dlg'] = null; } }
+  else { setPart('p-dlg', dialog()); const nd = S.dlg?.type === 'stk' && app.querySelector('#p-dlg .stkdlg'), st = nd && DB.get('stickers', S.dlg.id); if (st) nd._html = stickerHtml(st, true); }
   const ind = document.getElementById('ind'), b = app.querySelector('.rail .tabbtn[aria-selected="true"]');
   if (ind && b) {
     const top = (b.offsetTop + 6) + 'px';
@@ -336,7 +339,7 @@ function stickerHtml(s, big) {
   const todo = items.filter(x => !x.done), done = items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const open = !!S.doneOpen[s.id], fold = !!S.doneFold[s.id], shown = open ? done : done.slice(0, DONE_MAX);
   const row = x => `<div class="it" data-s="${s.id}" data-i="${x.id}"><input type="checkbox" ${x.done ? 'checked' : ''} data-act="it-chk" aria-label="Đánh dấu xong"><span class="it-t" contenteditable="plaintext-only" data-edit="it">${esc(x.text)}</span><button class="x" data-act="it-del" aria-label="Xóa mục" title="Xóa mục">${I.x14}</button></div>`;
-  const pin = `<button class="pinb" data-act="stk-pin" data-s="${s.id}" aria-pressed="${!!s.pinned}" title="${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}" aria-label="${s.pinned ? 'Bỏ ghim' : 'Ghim'}">${s.pinned ? I.pinF : I.pin}</button>`;
+  const pin = big ? (s.pinned ? `<span class="pinst" title="Đang ghim" aria-label="Đang ghim">${I.pinF}</span>` : '') : `<button class="pinb" data-act="stk-pin" data-s="${s.id}" aria-pressed="${!!s.pinned}" title="${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}" aria-label="${s.pinned ? 'Bỏ ghim' : 'Ghim'}">${s.pinned ? I.pinF : I.pin}</button>`;
   return `<div class="stk${big ? ' big' : ''}${s.pinned ? ' pinned' : ''}${big ? '' : enter('s' + s.id)}" data-s="${s.id}">
     <div class="stk-h">${big ? `<button class="pinb back" data-act="stk-close" title="Đóng" aria-label="Đóng">${I.back}</button>` : ''}<span class="stk-t" contenteditable="plaintext-only" data-edit="stk-title" data-s="${s.id}">${esc(s.title)}</span>${pin}<button class="more" data-act="stk-menu" data-s="${s.id}" aria-label="Tùy chọn" title="Ghim / xóa">${I.dots}</button></div>
     ${todo.map(row).join('')}
@@ -350,7 +353,8 @@ const MINI_ITEMS = 8;
 const stkKey = x => x.classList[0] + x.dataset.s; // thẻ nhỏ và thẻ đang mở to cùng id → phân biệt theo class
 function stickerMini(s) {
   const items = s.items || [], todo = items.filter(x => !x.done), dn = items.length - todo.length;
-  return `<div class="stkm${enter('m' + s.id)}" data-s="${s.id}" data-act="stk-open" role="button" aria-label="Mở ${esc(s.title || 'sticker')}">
+  return `<div class="stkm${s.pinned ? ' pinned' : ''}${enter('m' + s.id)}" data-s="${s.id}" data-act="stk-open" role="button" aria-label="Mở ${esc(s.title || 'sticker')}">
+    <button class="pinb" data-act="stk-pin" data-s="${s.id}" aria-pressed="${!!s.pinned}" title="${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}" aria-label="${s.pinned ? 'Bỏ ghim' : 'Ghim'}">${s.pinned ? I.pinF : I.pin}</button>
     ${s.title ? `<div class="stkm-t">${esc(s.title)}</div>` : ''}
     ${todo.slice(0, MINI_ITEMS).map(x => `<div class="stkm-i"><i></i><span>${esc(x.text)}</span></div>`).join('')}
     ${todo.length > MINI_ITEMS ? `<div class="stkm-x">…</div>` : ''}
@@ -529,7 +533,7 @@ function dialog() {
     <p>Bấm "Cài ngay" để Mon TriNote tự đóng, cài bản mới rồi mở lại. Ghi chú của bạn đã được lưu, không mất gì.</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Để sau</button><button class="btn pri" data-act="upd-restart">Cài ngay</button></div></div></div>`;
   if (S.dlg.type === 'acc') return accDialog();
-  if (S.dlg.type === 'stk') { const st = DB.get('stickers', S.dlg.id); return st ? `<div class="ov stkov" data-act="ov"><div class="dlg stkdlg" role="dialog" aria-label="${esc(st.title || 'Sticker')}">${stickerHtml(st, true)}</div></div>` : ''; }
+  if (S.dlg.type === 'stk') { const st = DB.get('stickers', S.dlg.id); return st ? `<div class="ov stkov" data-act="ov"><div class="dlg stkdlg" data-id="${st.id}" role="dialog" aria-label="${esc(st.title || 'Sticker')}">${stickerHtml(st, true)}</div></div>` : ''; }
   if (S.dlg.type === 'img') return `<div class="ov lightbox" data-act="ov-img"><img src="${S.dlg.src}" alt=""></div>`;
   if (S.dlg.type === 'confirm') return `<div class="ov" data-act="ov"><div class="dlg" role="dialog"><h2><span>${esc(S.dlg.title)}</span></h2><p>${esc(S.dlg.text)}</p>
     <div class="acts"><button class="btn" data-act="dlg-close">Hủy</button><button class="btn pri" data-act="dlg-ok">${esc(S.dlg.ok || 'Xóa')}</button></div></div></div>`;
@@ -599,7 +603,10 @@ function pinSticker(id) {
   const s = DB.get('stickers', id); if (!s) return;
   const pinned = !s.pinned, order = Math.max(0, ...stickers().filter(x => !!x.pinned === pinned).map(x => x.order ?? 0)) + 1;
   quiet = true; DB.put('stickers', { ...s, pinned, order }); quiet = false;
-  flip('.stk,.stkm', stkKey, () => { parts['p-main'] = null; render(true); });
+  flip('.stk,.stkm', stkKey, () => render(true), 420);
+  const card = app.querySelector(`.wall [data-s="${id}"]`);
+  card?.animate([{ boxShadow: '0 0 0 2px var(--red)' }, { boxShadow: '0 0 0 2px transparent' }], { duration: 900, easing: 'ease-out' });
+  if (pinned) app.querySelector('.main .scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
   toast(pinned ? 'Đã ghim lên đầu' : 'Đã bỏ ghim');
 }
 // đóng thẻ đang mở to: lưu chỗ đang gõ, thẻ trống thì xóa luôn (giống Keep)
@@ -744,7 +751,7 @@ app.addEventListener('click', async e => {
     case 'clr': { const sid = d.s; stkUpdate(sid, s => { s.items = s.items.filter(x => !x.done); }, true); flip('.stk,.stkm', stkKey, () => render(true)); toast('Đã xóa các mục đã xong'); return; }
     case 'stk-menu': {
       const s = DB.get('stickers', d.s);
-      popover(el, `<button class="mi" data-pin="1">${s.pinned ? I.pinF : I.pin}${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</button><button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
+      popover(el, `${S.dlg ? '' : `<button class="mi" data-pin="1">${s.pinned ? I.pinF : I.pin}${s.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</button>`}<button class="mi danger" data-del="1">${I.trash}Xóa sticker</button>`,
         o => { if (o.pin) return pinSticker(d.s); if (o.del) confirmDlg('Xóa sticker?', `"${s.title || 'Sticker'}" và tất cả mục bên trong sẽ bị xóa trên mọi máy.`, 'Xóa', () => { DB.remove('stickers', d.s); render(true); }); });
       return;
     }

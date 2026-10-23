@@ -532,3 +532,13 @@ mark{background:rgba(229,56,59,.28);color:inherit;border-radius:3px}
 .stk.big .pinb,.stk.big .stk-h .more{opacity:1}
 .stk.big .back{margin:-4px 4px 0 -6px;color:var(--tx)}
 .stk.big .it{font-size:15.5px;padding:6px 4px}
+
+/* ghim ngay trên thẻ thu gọn; trong màn chi tiết chỉ hiện trạng thái */
+.stkm{position:relative}
+.stkm .pinb{position:absolute;top:6px;right:6px;width:32px;height:32px;margin:0;opacity:.45}
+.stkm .pinb[aria-pressed="true"]{opacity:1;color:var(--tx)}
+.stkm .stkm-t{padding-right:26px}
+.stkm:not(:has(.stkm-t)) .stkm-i:first-of-type{padding-right:26px}
+.pinst{display:grid;place-items:center;width:30px;height:30px;color:var(--mu);flex:0 0 auto;margin-top:-4px}
+.stk:not(.big) .pinb{opacity:.45}
+.stk:not(.big) .pinb[aria-pressed="true"],.stk:hover .pinb{opacity:1}
