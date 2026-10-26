@@ -58,17 +58,20 @@ jobs:
       - run: npm ci
       - run: npx vite build
       - run: npx cap sync android
+      - name: Giải mã khoá ký (GitHub Secrets)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ]; then echo "::error::Thiếu secret ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD"; exit 1; fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/mondiro.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/mondiro.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
+          echo "::add-mask::$KS_PASS"
       - name: Build APK
         shell: bash
         run: |
           VER="${TAG#v}"
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
-            export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
-            export ANDROID_KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-            export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
-            export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
-          fi
           cd android && chmod +x gradlew && ./gradlew assembleRelease -PappVersion="$VER" --no-daemon
           mkdir -p ../out && cp app/build/outputs/apk/release/app-release.apk "../out/Mon-TriNote-$VER.apk"
       - uses: actions/upload-artifact@v4
