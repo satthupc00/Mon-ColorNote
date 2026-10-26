@@ -4,7 +4,7 @@ android {
     namespace "com.mondiro.trinote"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mondiro.trinote"
+        applicationId "com.mondiro.mtrinote"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI truyền -PappVersion=0.1.0; versionCode = major*10000 + minor*100 + patch
@@ -19,19 +19,23 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Khoá ký lấy từ GitHub Secrets (ANDROID_KEYSTORE_BASE64 + ANDROID_KEYSTORE_PASSWORD).
+    // KHÔNG để file khoá trong repo (repo public). Alias cố định: mondiro.
+    def ksFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    def ksPass = System.getenv("ANDROID_KEYSTORE_PASSWORD")
     signingConfigs {
-        release {
-            // Ưu tiên keystore trong GitHub Secrets (ANDROID_KEYSTORE_*), không có thì dùng keystore đi kèm repo
-            def ksFile = System.getenv("ANDROID_KEYSTORE_FILE")
-            storeFile file(ksFile ?: "trinote-release.jks")
-            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "trinote-mondiro"
-            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "trinote"
-            keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: "trinote-mondiro"
+        mondiro {
+            if (ksFile && ksPass) {
+                storeFile file(ksFile)
+                storePassword ksPass
+                keyAlias "mondiro"
+                keyPassword ksPass
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            signingConfig((ksFile && ksPass) ? signingConfigs.mondiro : signingConfigs.debug)
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
